@@ -31,11 +31,14 @@ class FullscreenApp:
         style.configure("TLabel", font=("Arial", 11))
         style.configure("TButton", font=("Arial", 11, "bold"))
 
-        # ====== Кнопка запуска ======
+        # ====== Кнопки запуска и закрытия ======
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
         btn_frame.pack(fill="x", padx=20, pady=10)
+
         tk.Button(btn_frame, text="▶ Запустить проверку", font=("Arial", 12, "bold"),
-                  bg="#4CAF50", fg="white", command=self.run).pack()
+                  bg="#4CAF50", fg="white", command=self.run).pack(side="left", padx=5)
+        tk.Button(btn_frame, text="❌", font=("Arial", 12, "bold"),
+                  bg="#F44336", fg="white", command=self.root.destroy).pack(side="right", padx=5)
 
         # ====== Блок выбора файлов ======
         file_frame = ttk.LabelFrame(self.root, text="Выбор файлов")

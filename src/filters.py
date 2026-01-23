@@ -2,17 +2,31 @@ import pandas as pd
 from datetime import datetime
 from .constants import ACTIVE_DATE
 
+import pandas as pd
+
+import pandas as pd
+
 def normalize_fio(fio: str) -> str:
-    if pd.isna(fio):
+    if pd.isna(fio) or fio is None:
         return ""
-    fio = str(fio).replace(".", "").strip()
-    fio = fio.replace("Ё", "Е").replace("ё", "е")
+    
+    fio = str(fio).replace(".", "").strip()  # убираем точки и пробелы
+    fio = fio.replace("Ё", "Е").replace("ё", "е")  # нормализуем ё
     parts = fio.split()
+    
     if len(parts) >= 3:
+        # Фамилия + инициалы (первые буквы имени и отчества)
         return f"{parts[0]} {parts[1][0]}{parts[2][0]}".upper()
     elif len(parts) == 2:
+        # Фамилия + имя полностью
         return f"{parts[0]} {parts[1]}".upper()
-    return fio.upper()
+    elif len(parts) == 1:
+        # Только фамилия
+        return parts[0].upper()
+    
+    return ""
+
+
 
 def is_active(dismiss_value) -> bool:
     """Возвращает True, если сотрудник активен"""
