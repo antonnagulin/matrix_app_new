@@ -1,0 +1,38 @@
+import pandas as pd
+from datetime import datetime
+from .constants import ACTIVE_DATE
+
+def normalize_fio(fio: str) -> str:
+    if pd.isna(fio):
+        return ""
+    fio = str(fio).replace(".", "").strip()
+    fio = fio.replace("Ё", "Е").replace("ё", "е")
+    parts = fio.split()
+    if len(parts) >= 3:
+        return f"{parts[0]} {parts[1][0]}{parts[2][0]}".upper()
+    elif len(parts) == 2:
+        return f"{parts[0]} {parts[1]}".upper()
+    return fio.upper()
+
+def is_active(dismiss_value) -> bool:
+    """Возвращает True, если сотрудник активен"""
+    if pd.isna(dismiss_value):
+        return False
+    if isinstance(dismiss_value, str):
+        try:
+            if "-" in dismiss_value:
+                d = pd.to_datetime(dismiss_value).date()
+            else:
+                d = datetime.strptime(dismiss_value, "%d.%m.%Y").date()
+            return d == datetime.strptime(ACTIVE_DATE, "%d.%m.%Y").date()
+        except:
+            return False
+    if isinstance(dismiss_value, (pd.Timestamp, datetime)):
+        return dismiss_value.date() == datetime.strptime(ACTIVE_DATE, "%d.%m.%Y").date()
+    return False
+
+def is_dismissed(record) -> bool:
+    position = str(record.get("Штатная должность", "")).strip()
+    status = str(record.get("Статус занятости", "")).strip().lower()
+    dismiss = record.get("Увольн.")
+    return position == "Интеграция: штатная должность по умолч." or status == "уволился" or not is_active(dismiss)

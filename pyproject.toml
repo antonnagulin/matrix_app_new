@@ -1,0 +1,19 @@
+[project]
+name = "scripts"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "antonnagulin",email = "nagulin03@mail.ru"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas (>=3.0.0,<4.0.0)",
+    "openpyxl (>=3.1.5,<4.0.0)",
+    "pytest (>=9.0.2,<10.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
