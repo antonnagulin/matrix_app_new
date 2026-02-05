@@ -19,7 +19,7 @@ class FullscreenApp:
         # ====== Переменные ======
         self.sprav = tk.StringVar()
         self.check = tk.StringVar()
-        self.output = tk.StringVar(value="check_result.xlsx")
+        self.output = tk.StringVar()
         self.dismissed = tk.BooleanVar(value=True)
         self.duplicates = tk.BooleanVar(value=True)
 
@@ -46,7 +46,8 @@ class FullscreenApp:
 
         self.row_file(file_frame, "Справочник:", self.sprav, 0)
         self.row_file(file_frame, "Файл проверки:", self.check, 1)
-        ttk.Label(file_frame, text="Файл результата:").grid(row=2, column=0, sticky="w", pady=5)
+        self.row_file(file_frame, "Файл результата:", self.output, 2)
+        # ttk.Label(file_frame, text="Файл результата:").grid(row=2, column=0, sticky="w", pady=5)
         ttk.Entry(file_frame, textvariable=self.output, width=50).grid(row=2, column=1, sticky="w", pady=5)
 
         # ====== Блок опций ======

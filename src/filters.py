@@ -9,7 +9,7 @@ import pandas as pd
 def normalize_fio(fio: str) -> str:
     if pd.isna(fio) or fio is None:
         return ""
-    
+        
     fio = str(fio).replace(".", "").strip()  # убираем точки и пробелы
     fio = fio.replace("Ё", "Е").replace("ё", "е")  # нормализуем ё
     parts = fio.split()
@@ -23,6 +23,17 @@ def normalize_fio(fio: str) -> str:
     elif len(parts) == 1:
         # Только фамилия
         return parts[0].upper()
+
+
+
+def normalize_spr_fio(fio: str) -> str:
+    if pd.isna(fio) or fio is None:
+        return ""
+
+    fio = fio.replace("Ё", "Е").replace("ё", "е")  # нормализуем ё
+    parts = fio.split()
+    if len(parts) >= 3:
+        return f"{parts[0]} {parts[1]} {parts[2]}".upper()
     
     return ""
 
@@ -49,4 +60,5 @@ def is_dismissed(record) -> bool:
     position = str(record.get("Штатная должность", "")).strip()
     status = str(record.get("Статус занятости", "")).strip().lower()
     dismiss = record.get("Увольн.")
-    return position == "Интеграция: штатная должность по умолч." or status == "уволился" or not is_active(dismiss)
+    # return position == "Интеграция: штатная должность по умолч." or status == "уволился" or not is_active(dismiss)
+    return status == "уволился" or not is_active(dismiss)
