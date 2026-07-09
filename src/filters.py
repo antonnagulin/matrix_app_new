@@ -1,10 +1,8 @@
-import pandas as pd
 from datetime import datetime
+import sys
 from .constants import ACTIVE_DATE
-
 import pandas as pd
 
-import pandas as pd
 
 def normalize_fio(fio: str) -> str:
     if pd.isna(fio) or fio is None:
@@ -38,6 +36,15 @@ def normalize_spr_fio(fio: str) -> str:
     return ""
 
 
+def is_full_fio(fio: str) -> bool:
+    """
+    Проверяет, что ФИО в формате 'Иванов Иван Иванович'
+    """
+    parts = fio.split()
+    if len(parts) != 3:
+        return False
+    return all(len(p) > 1 for p in parts)
+
 
 def is_active(dismiss_value) -> bool:
     """Возвращает True, если сотрудник активен"""
@@ -56,9 +63,19 @@ def is_active(dismiss_value) -> bool:
         return dismiss_value.date() == datetime.strptime(ACTIVE_DATE, "%d.%m.%Y").date()
     return False
 
-def is_dismissed(record) -> bool:
-    position = str(record.get("Штатная должность", "")).strip()
+
+def is_dismissed(record: dict) -> bool:
     status = str(record.get("Статус занятости", "")).strip().lower()
     dismiss = record.get("Увольн.")
-    # return position == "Интеграция: штатная должность по умолч." or status == "уволился" or not is_active(dismiss)
     return status == "уволился" or not is_active(dismiss)
+
+
+def join_with_slash(row):
+    parts = [
+        row.get("Орг. единица уровня 1", ""),
+        row.get("Орг. единица уровня 2", ""),
+        row.get("Орг. единица уровня 3", ""),
+        row.get("Орг. единица уровня 4", ""),
+    ]
+    parts = [str(p).strip() for p in parts if pd.notna(p) and str(p).strip()]
+    return " / ".join(parts)

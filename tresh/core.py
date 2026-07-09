@@ -1,8 +1,9 @@
-from .filters import normalize_fio, is_dismissed
-from .file_utils import read_sprav_file, load_check_file, save_file, get_fill
-from .constants import FIO_COL, RED_FILL_COLOR, ORANGE_FILL_COLOR
+from ..src.filters import normalize_fio, is_dismissed
+from ..src.file_utils import read_sprav_file, load_check_file, save_file, get_fill
+from ..src.constants import FIO_COL, RED_FILL_COLOR, ORANGE_FILL_COLOR
 import openpyxl
-import pandas as pd
+import pandas as pdd
+from ..src.check_chainge_fio import chainge_fio
 
 
 def core(
@@ -29,6 +30,7 @@ def core(
         fio_norm = normalize_fio(row[FIO_COL])
         if fio_norm:
             fio_dict.setdefault(fio_norm, []).append(row)
+    
     
     write(f"Справочник загружен ({len(fio_dict)} уникальных ФИО)")
 
@@ -84,24 +86,36 @@ def core(
                     orange_dismissed.append(str(fio_value))
 
 
-    print("Не нашлись в справочнике без уволенных сотрудников")
-    print(red_not_found)
+    chainge_fio(red_not_found, chainge_fio_file)
 
-    chainge_fio_df = read_sprav_file(chainge_fio_file)
+    # print("Не нашлись в справочнике")
+    # print(red_not_found)
 
-    for item in red_not_found:
-        mask = chainge_fio_df.astype(str).apply(
-                lambda row: row.str.contains(item, case=False, na=False).any(),
-                axis=1
-            )
+    # chainge_fio_df = read_sprav_file(chainge_fio_file)
 
-        matched_rows = chainge_fio_df[mask]
+    # # Предполагаем, что ФИО лежит в колонке "ФИО"
+    # # Нормализуем ФИО в справочнике ОДИН раз
+    # chainge_fio_df["ФИО_NORM"] = chainge_fio_df["Смена ФИО"].apply(normalize_fio)
+    # not_in_all = []
+    # for item in red_not_found:
+    #     item_norm = normalize_fio(item)
 
-        if not matched_rows.empty:
-            print(f"\nНайдено совпадение для: {item}")
-            print(matched_rows)
+    #     matched_rows = chainge_fio_df[
+    #         chainge_fio_df["ФИО_NORM"] == item_norm
+    #     ]
 
+    #     if not matched_rows.empty:
+    #         print(f"\nНайдено совпадение для: {item}")
+    #         print(matched_rows.drop(columns=["ФИО_NORM"]))
 
+    #     else:
+    #         not_in_all.append(item)
+
+    # if not_in_all:        
+    #     print("Не нашлись вообще")        
+    #     print(not_in_all)
+
+        
     # ====== Лог: отсутствующие ======
     # write()
     # if red_not_found:
