@@ -1,60 +1,41 @@
-import pytest
+"""Тесты file_utils — чтение/запись Excel и заливки."""
+
 import pandas as pd
-from datetime import datetime
-from src.filters import normalize_fio, is_active, is_dismissed
+from openpyxl import Workbook, load_workbook
 
-def test_normalize_fio():
-    # Полное ФИО
-    assert normalize_fio("Иванов Иван Иванович") == "ИВАНОВ ИИ"
-    # ФИО с точками
-    assert normalize_fio("Петров П. П.") == "ПЕТРОВ ПП"
-    # ФИО с Ё
-    assert normalize_fio("Ёлкин Е. Е.") == "ЕЛКИН ЕЕ"
-    # Два слова
-    assert normalize_fio("Сидоров Сергей") == "СИДОРОВ СЕРГЕЙ"
-    # Пустое
-    assert normalize_fio(None) == ""
+from src.file_utils import read_sprav_file, load_check_file, save_file, get_fill
+from src.constants import RED_FILL_COLOR
 
-def test_is_active():
-    # Строка в формате дд.мм.гггг
-    assert is_active("31.12.9999") is True
-    assert is_active("01.01.2025") is False
-    # pd.Timestamp
-    assert is_active(pd.Timestamp("9999-12-31")) is True
-    # datetime
-    assert is_active(datetime(9999,12,31)) is True
-    # None
-    assert is_active(None) is False
 
-def test_is_dismissed():
-    # Сотрудник активен
-    record_active = {
-        "Штатная должность": "Менеджер",
-        "Статус занятости": "работает",
-        "Увольн.": "31.12.9999"
-    }
-    assert is_dismissed(record_active) is False
+def test_read_sprav_fills_na_with_empty_string(tmp_path):
+    path = tmp_path / "sprav.xlsx"
+    pd.DataFrame({"ФИО": ["А", None], "Увольн.": [None, "01.01.2020"]}).to_excel(
+        path, index=False
+    )
 
-    # Сотрудник уволен по позиции
-    record_position = {
-        "Штатная должность": "Интеграция: штатная должность по умолч.",
-        "Статус занятости": "работает",
-        "Увольн.": "31.12.9999"
-    }
-    assert is_dismissed(record_position) is True
+    df = read_sprav_file(path)
 
-    # Сотрудник уволен по статусу
-    record_status = {
-        "Штатная должность": "Менеджер",
-        "Статус занятости": "уволился",
-        "Увольн.": "31.12.9999"
-    }
-    assert is_dismissed(record_status) is True
+    assert df.loc[1, "ФИО"] == ""
+    assert df.loc[0, "Увольн."] == ""
 
-    # Сотрудник уволен по дате
-    record_date = {
-        "Штатная должность": "Менеджер",
-        "Статус занятости": "работает",
-        "Увольн.": "01.01.2025"
-    }
-    assert is_dismissed(record_date) is True
+
+def test_load_and_save_roundtrip(tmp_path):
+    src = tmp_path / "in.xlsx"
+    dst = tmp_path / "out.xlsx"
+
+    wb = Workbook()
+    wb.active["A1"] = "ФИО"
+    wb.active["A2"] = "Тестов Т. Т."
+    wb.save(src)
+
+    loaded_wb, loaded_ws = load_check_file(src)
+    assert loaded_ws["A2"].value == "Тестов Т. Т."
+
+    save_file(loaded_wb, dst)
+    assert load_workbook(dst).active["A2"].value == "Тестов Т. Т."
+
+
+def test_get_fill_returns_solid_pattern():
+    fill = get_fill(RED_FILL_COLOR)
+    assert fill.fill_type == "solid"
+    assert fill.start_color.rgb.endswith(RED_FILL_COLOR)

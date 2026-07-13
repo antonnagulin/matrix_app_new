@@ -22,6 +22,8 @@ def normalize_fio(fio: str) -> str:
         # Только фамилия
         return parts[0].upper()
 
+    return ""
+
 
 
 def normalize_spr_fio(fio: str) -> str:
@@ -65,9 +67,14 @@ def is_active(dismiss_value) -> bool:
 
 
 def is_dismissed(record: dict) -> bool:
+    position = str(record.get("Штатная должность", "")).strip()
     status = str(record.get("Статус занятости", "")).strip().lower()
     dismiss = record.get("Увольн.")
-    return status == "уволился" or not is_active(dismiss)
+    return (
+        position == "Интеграция: штатная должность по умолч."
+        or status == "уволился"
+        or not is_active(dismiss)
+    )
 
 
 def join_with_slash(row):

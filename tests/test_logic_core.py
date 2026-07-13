@@ -1,7 +1,5 @@
 from src.logic import run_check
-from openpyxl.styles import PatternFill
-import tempfile
-import os
+from src.constants import RED_FILL_COLOR, ORANGE_FILL_COLOR
 
 
 class DummyLog:
@@ -15,15 +13,10 @@ class DummyLog:
         pass
 
 
-def test_run_check_red_and_orange(
-    sprav_df,
-    check_wb,
-    monkeypatch
-):
+def test_run_check_red_and_orange(sprav_df, check_wb, monkeypatch):
     wb, ws = check_wb
     log = DummyLog()
 
-    # мок файловых функций
     monkeypatch.setattr("src.logic.read_sprav_file", lambda _: sprav_df)
     monkeypatch.setattr("src.logic.load_check_file", lambda _: (wb, ws))
     monkeypatch.setattr("src.logic.save_file", lambda *_: None)
@@ -32,11 +25,13 @@ def test_run_check_red_and_orange(
         sprav_file="sprav.xlsx",
         check_file="check.xlsx",
         output_file="out.xlsx",
-        log=log
+        check_dismissed=True,
+        check_duplicates=False,
+        log=log,
     )
 
-    red = PatternFill(start_color="FF9999", fill_type="solid")
-    orange = PatternFill(start_color="FF7500", fill_type="solid")
-
-    assert ws["A2"].fill.start_color.rgb is not None  # Иванов → оранжевый
-    assert ws["A3"].fill.start_color.rgb is not None  # Петров → красный
+    # Иванов есть в справочнике и уволен (вторая запись) → оранжевый
+    assert ORANGE_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+    # Петров отсутствует → красный
+    assert RED_FILL_COLOR in (ws["A3"].fill.start_color.rgb or "")
+    assert "Петров Петр Петрович" in "".join(log.lines)
