@@ -27,7 +27,7 @@ if errorlevel 1 (
 echo.
 echo === Установка зависимостей проекта ===
 if "%USE_POETRY%"=="1" (
-  poetry install --extras build
+  poetry install --extras build --no-root
   if errorlevel 1 (
     echo Не удалось установить зависимости через poetry install.
     pause
