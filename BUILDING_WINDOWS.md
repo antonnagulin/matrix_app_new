@@ -53,7 +53,18 @@ dist\matrix-check\matrix-check.exe
    ```
    Должно вывести `64`.
 
-## 6. Ручная сборка (если нужно)
+## 6. Ошибка `Tcl data directory ... not found`
+
+PyInstaller не упаковал библиотеки tkinter. В актуальном `matrix-check.spec` это исправлено — папки `tcl8.6` и `tk8.6` кладутся в `_internal\_tcl_data` и `_internal\_tk_data`.
+
+Пересоберите:
+```powershell
+build_windows_pyinstaller.bat
+```
+
+Если ошибка останется — переустановите Python с галочкой **tcl/tk and IDLE**.
+
+## 7. Ручная сборка (если нужно)
 
 ```powershell
 poetry run python -m pip install -U pyinstaller
