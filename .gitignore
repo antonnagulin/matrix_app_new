@@ -12,3 +12,8 @@ src/settings/settings.py
 tresh/2_step.py
 tresh/position_set.py
 tresh/test.py
+
+# PyInstaller outputs
+dist/
+build/
+*.spec
