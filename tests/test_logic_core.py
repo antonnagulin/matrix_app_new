@@ -55,6 +55,7 @@ def test_run_check_resolves_duplicate_to_green(sprav_df, check_wb, monkeypatch):
         log=log,
     )
 
-    # После фильтрации остаётся одна активная запись → зелёный
-    assert GREEN_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+    # После фильтрации: ФИО жёлтый, следующая колонка — зелёная
+    assert ELOYY_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+    assert GREEN_FILL_COLOR in (ws["B2"].fill.start_color.rgb or "")
     assert RED_FILL_COLOR in (ws["A3"].fill.start_color.rgb or "")

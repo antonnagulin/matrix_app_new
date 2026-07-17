@@ -340,7 +340,8 @@ def test_duplicates_logged_and_selection_called(monkeypatch):
     assert selected["count"] == 2
     assert "Дубликаты в справочнике для" in log.text()
     assert "Выбрана актуальная запись" in log.text()
-    assert GREEN_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+    assert GREEN_FILL_COLOR in (ws["C2"].fill.start_color.rgb or "")
+    assert ELOYY_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
 
 
 def test_skip_all_duplicates_skips_remaining_prompts(monkeypatch):
@@ -615,7 +616,8 @@ def test_mixed_duplicate_resolves_to_green(monkeypatch):
     )
 
     assert calls["count"] == 0
-    assert GREEN_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+    assert GREEN_FILL_COLOR in (ws["B2"].fill.start_color.rgb or "")
+    assert ELOYY_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
 
 
 def test_all_dismissed_duplicates_mark_orange(monkeypatch):

@@ -38,14 +38,20 @@ def test_medium_sample_produces_expected_highlights(tmp_path):
     assert output.exists()
     ws = load_workbook(output).active
 
-    def _has_color(row: int, color: str) -> bool:
-        return color in (ws.cell(row=row, column=1).fill.start_color.rgb or "")
+    def _has_color(row: int, col: int, color: str) -> bool:
+        return color in (ws.cell(row=row, column=col).fill.start_color.rgb or "")
 
-    assert _has_color(17, GREEN_FILL_COLOR)
-    assert _has_color(18, GREEN_FILL_COLOR)
-    assert _has_color(19, ELOYY_FILL_COLOR)
-    assert _has_color(20, ELOYY_FILL_COLOR)
-    assert _has_color(27, RED_FILL_COLOR)
+    # Шаг 1: жёлтый на ФИО; шаг 2: зелёный в следующей колонке
+    assert _has_color(17, 1, ELOYY_FILL_COLOR)
+    assert _has_color(17, 2, GREEN_FILL_COLOR)
+    assert _has_color(18, 1, ELOYY_FILL_COLOR)
+    assert _has_color(18, 2, GREEN_FILL_COLOR)
+    # Два активных — жёлтый на шагах 2 и 3
+    assert _has_color(19, 1, ELOYY_FILL_COLOR)
+    assert _has_color(19, 2, ELOYY_FILL_COLOR)
+    assert _has_color(20, 1, ELOYY_FILL_COLOR)
+    assert _has_color(20, 2, ELOYY_FILL_COLOR)
+    assert _has_color(27, 1, RED_FILL_COLOR)
 
     log_text = "".join(log_lines)
     assert "Строка заголовков" in log_text

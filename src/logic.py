@@ -362,15 +362,12 @@ def run_check(
         write("\nРазбор дубликатов в справочнике...")
         new_d, not_d, dismissed_dups = check_duplicate(elloyy_dublicate)
 
-        # Сохраняем жёлтый на ФИО у ещё неоднозначных; зелёный — у однозначно найденных
-        paint_rows_by_dict(ws, new_d, yellow_fill, fio_col_index)
-        paint_rows_by_dict(ws, not_d, green_fill, fio_col_index)
-        write_position_eararchi(ws, not_d, new_col_hierarchy_index, new_col_position_index)
-        # Соседние колонки — как в исходном варианте
+        # Шаг 2: жёлтый/зелёный в следующей колонке (ФИО остаётся жёлтым)
         paint_rows_by_dict(ws, new_d, yellow_fill, fio_col_index + 1)
         paint_rows_by_dict(ws, not_d, green_fill, fio_col_index + 1)
+        write_position_eararchi(ws, not_d, new_col_hierarchy_index, new_col_position_index)
 
-        # Все отфильтрованные как неактивные → оранжевый
+        # Все отфильтрованные как неактивные → оранжевый на ФИО
         paint_rows_by_dict(ws, dismissed_dups, orange_fill, fio_col_index)
         for (row_idx, _, _, _), records in dismissed_dups.items():
             _write_sprav_columns(
@@ -379,10 +376,9 @@ def run_check(
 
         resolved_count = len(not_d)
         remaining_d, resolved_full = second_check_duplicate(new_d)
+        # Шаг 3: жёлтый/зелёный во второй следующей колонке
         paint_rows_by_dict(ws, remaining_d, yellow_fill, fio_col_index + 2)
         paint_rows_by_dict(ws, resolved_full, green_fill, fio_col_index + 2)
-        # Уточнённые полным ФИО — перекрашиваем и колонку ФИО
-        paint_rows_by_dict(ws, resolved_full, green_fill, fio_col_index)
         write_position_eararchi(ws, resolved_full, new_col_hierarchy_index, new_col_position_index)
 
         write(
@@ -416,7 +412,7 @@ def run_check(
                     fill = orange_fill if is_dismissed(choice) else green_fill
                     for (r, fn, _, _), _recs in list(remaining_d.items()):
                         if fn == fio_norm:
-                            ws.cell(row=r, column=fio_col_index).fill = fill
+                            ws.cell(row=r, column=fio_col_index + 2).fill = fill
                             _write_sprav_columns(
                                 ws,
                                 r,
