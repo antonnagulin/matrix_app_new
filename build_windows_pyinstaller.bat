@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal enabledelayedexpansion
 
 REM Сборка GUI-приложения для Windows через PyInstaller.
@@ -6,17 +7,44 @@ REM Результат: dist\matrix-check\matrix-check.exe
 
 cd /d "%~dp0"
 
-echo === Проверка Python ===
+set "USE_POETRY=0"
 where poetry >nul 2>&1
 if %errorlevel%==0 (
+  set "USE_POETRY=1"
   set "PY_CMD=poetry run python"
 ) else (
   set "PY_CMD=python"
 )
 
+echo === Проверка Python ===
 %PY_CMD% --version
 if errorlevel 1 (
   echo Python не найден. Установите Python 3.12 x64.
+  pause
+  exit /b 1
+)
+
+echo.
+echo === Установка зависимостей проекта ===
+if "%USE_POETRY%"=="1" (
+  poetry install --extras build
+  if errorlevel 1 (
+    echo Не удалось установить зависимости через poetry install.
+    pause
+    exit /b 1
+  )
+) else (
+  %PY_CMD% -m pip install -U pip
+  %PY_CMD% -m pip install "pandas>=3,<4" "openpyxl>=3.1.5,<4" "tqdm>=4.67,<5" "xlrd>=2,<3" "tabulate>=0.10,<0.11" "pyinstaller>=6,<7"
+)
+
+echo.
+echo === Проверка pandas/openpyxl ===
+%PY_CMD% -c "import pandas, openpyxl; print('pandas/openpyxl OK')"
+if errorlevel 1 (
+  echo.
+  echo ОШИБКА: pandas или openpyxl не установлены в окружении сборки.
+  echo Выполните: poetry install
   pause
   exit /b 1
 )

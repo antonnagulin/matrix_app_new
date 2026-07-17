@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller spec для matrix-check (Windows GUI + tkinter)."""
 
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -29,6 +30,16 @@ def _tcl_tk_datas():
     return pairs
 
 
+def _collect_package(package: str):
+    if importlib.util.find_spec(package) is None:
+        raise SystemExit(
+            f"Модуль '{package}' не установлен в текущем окружении. "
+            "Сначала выполните: poetry install"
+        )
+    pkg_datas, pkg_binaries, pkg_hidden = collect_all(package)
+    return pkg_datas, pkg_binaries, pkg_hidden
+
+
 datas = _tcl_tk_datas()
 binaries = []
 hiddenimports = [
@@ -37,10 +48,12 @@ hiddenimports = [
     "tkinter.filedialog",
     "tkinter.messagebox",
     "tkinter.scrolledtext",
+    "pandas",
+    "openpyxl",
 ]
 
 for package in ("tkinter", "pandas", "openpyxl"):
-    pkg_datas, pkg_binaries, pkg_hidden = collect_all(package)
+    pkg_datas, pkg_binaries, pkg_hidden = _collect_package(package)
     datas += pkg_datas
     binaries += pkg_binaries
     hiddenimports += pkg_hidden
