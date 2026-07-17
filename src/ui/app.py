@@ -61,19 +61,24 @@ class EmployeeCheckApp:
     setup_styles(root)
     self._build_ui()
     self._bind_events()
+    self._apply_window_geometry()
 
   def _configure_window(self) -> None:
     self.root.title(self.WINDOW_TITLE)
     self.root.minsize(self.MIN_WIDTH, self.MIN_HEIGHT)
     self.root.configure(bg=COLORS["bg"])
-    self._center_window(self.DEFAULT_WIDTH, self.DEFAULT_HEIGHT)
 
-  def _center_window(self, width: int, height: int) -> None:
-    self.root.geometry(f"{width}x{height}")
+  def _apply_window_geometry(self) -> None:
     self.root.update_idletasks()
-    x = (self.root.winfo_screenwidth() - width) // 2
-    y = (self.root.winfo_screenheight() - height) // 2
-    self.root.geometry(f"{width}x{height}+{max(x, 0)}+{max(y, 0)}")
+    width = max(self.DEFAULT_WIDTH, self.root.winfo_reqwidth())
+    height = max(self.DEFAULT_HEIGHT, self.root.winfo_reqheight())
+    screen_w = self.root.winfo_screenwidth()
+    screen_h = self.root.winfo_screenheight()
+    width = min(width, max(screen_w - 40, self.MIN_WIDTH))
+    height = min(height, max(screen_h - 80, self.MIN_HEIGHT))
+    x = max((screen_w - width) // 2, 0)
+    y = max((screen_h - height) // 2, 0)
+    self.root.geometry(f"{width}x{height}+{x}+{y}")
 
   def _build_ui(self) -> None:
     self._build_header()
@@ -89,9 +94,8 @@ class EmployeeCheckApp:
     self._build_status_bar()
 
   def _build_header(self) -> None:
-    header = tk.Frame(self.root, bg=COLORS["header_bg"], height=72)
+    header = tk.Frame(self.root, bg=COLORS["header_bg"])
     header.pack(fill="x")
-    header.pack_propagate(False)
 
     inner = tk.Frame(header, bg=COLORS["header_bg"])
     inner.pack(fill="both", expand=True, padx=20, pady=12)

@@ -4,25 +4,23 @@ from __future__ import annotations
 
 import sys
 
+if sys.platform == "win32":
+    import ctypes
+    from ctypes import wintypes
+
 
 def enable_dpi_awareness() -> None:
-    """Включить per-monitor DPI до создания окон tkinter."""
+    """Включить DPI awareness до создания окон tkinter.
+
+    Для tkinter надёжнее system-DPI, чем PerMonitorV2: иначе geometry()
+    может не применяться и окно остаётся высотой в одну шапку.
+    """
     if sys.platform != "win32":
         return
 
-    import ctypes
-
     try:
-        user32 = ctypes.windll.user32
-        # PerMonitorV2 — Windows 10 1703+
-        if user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4)):
-            return
-    except (AttributeError, OSError):
-        pass
-
-    try:
-        # PROCESS_PER_MONITOR_DPI_AWARE = 2
-        if ctypes.windll.shcore.SetProcessDpiAwareness(2) == 0:
+        # PROCESS_SYSTEM_DPI_AWARE = 1
+        if ctypes.windll.shcore.SetProcessDpiAwareness(1) == 0:
             return
     except (AttributeError, OSError):
         pass
@@ -30,4 +28,19 @@ def enable_dpi_awareness() -> None:
     try:
         ctypes.windll.user32.SetProcessDPIAware()
     except (AttributeError, OSError):
+        pass
+
+
+def configure_tk_scaling(root) -> None:
+    """Синхронизировать tk scaling с DPI монитора."""
+    if sys.platform != "win32":
+        return
+
+    try:
+        hwnd = wintypes.HWND(root.winfo_id())
+        dpi = ctypes.windll.user32.GetDpiForWindow(hwnd)
+        if dpi <= 0:
+            dpi = 96
+        root.tk.call("tk", "scaling", dpi / 72.0)
+    except Exception:
         pass
