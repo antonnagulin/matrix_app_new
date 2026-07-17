@@ -88,6 +88,19 @@ SKIP_ALL_DUPLICATES = "skip_all"
 
 COL_HIERARCHY_NAME = "Подразделение"
 COL_POSITION_NAME = "Штатная должность (справочник)"
+COL_COMMENT_NAME = "Комментарий"
+
+MSG_NOT_FOUND = "Не найден в справочнике"
+MSG_DISMISSED = "Сотрудник уволен или неактивен"
+MSG_DUP_STEP1 = "Дубликат в справочнике (шаг 1)"
+MSG_DUP_STEP1_NO_CHECK = "Дубликат в справочнике (разбор дубликатов отключён)"
+MSG_DUP_STEP2_YELLOW = "Дубликат не разрешён после 1-й проверки (шаг 2)"
+MSG_DUP_STEP2_GREEN = "Дубликат разрешён после 1-й проверки (шаг 2)"
+MSG_DUP_STEP3_YELLOW = "Дубликат не разрешён после 2-й проверки (шаг 3)"
+MSG_DUP_STEP3_GREEN = "Дубликат разрешён по полному ФИО (шаг 3)"
+MSG_DUP_ALL_DISMISSED = "Все записи дубликата уволены"
+MSG_DUP_MANUAL_ACTIVE = "Дубликат выбран вручную — активная запись"
+MSG_DUP_MANUAL_DISMISSED = "Дубликат выбран вручную — уволенная запись"
 
 
 def _record_as_dict(record) -> dict:
@@ -100,6 +113,15 @@ def _write_sprav_columns(ws, row: int, record, hierarchy_col: int, position_col:
     rec = _record_as_dict(record)
     ws.cell(row=row, column=hierarchy_col, value=join_with_slash(rec))
     ws.cell(row=row, column=position_col, value=rec.get("Штатная должность", ""))
+
+
+def _write_comment(ws, row: int, comment_col: int, text: str) -> None:
+    ws.cell(row=row, column=comment_col, value=text)
+
+
+def _comment_rows(ws, data_dict: dict, comment_col: int, text: str) -> None:
+    for (row, *_rest) in data_dict.keys():
+        _write_comment(ws, row, comment_col, text)
 
 
 def choose_actual_record(parent, fio, records):
@@ -253,9 +275,12 @@ def run_check(
     ws.cell(row=header_row, column=last_col + 1, value=COL_HIERARCHY_NAME)
     ws.insert_cols(last_col + 2)
     ws.cell(row=header_row, column=last_col + 2, value=COL_POSITION_NAME)
+    ws.insert_cols(last_col + 3)
+    ws.cell(row=header_row, column=last_col + 3, value=COL_COMMENT_NAME)
     new_col_hierarchy_index = last_col + 1
     new_col_position_index = last_col + 2
-    headers = headers + [COL_HIERARCHY_NAME, COL_POSITION_NAME]
+    new_col_comment_index = last_col + 3
+    headers = headers + [COL_HIERARCHY_NAME, COL_POSITION_NAME, COL_COMMENT_NAME]
 
     red_fill = get_fill(RED_FILL_COLOR)
     orange_fill = get_fill(ORANGE_FILL_COLOR)
@@ -294,6 +319,7 @@ def run_check(
                 fio_cell.fill = red_fill
                 ws.cell(row=row, column=new_col_hierarchy_index, value="")
                 ws.cell(row=row, column=new_col_position_index, value="")
+                _write_comment(ws, row, new_col_comment_index, MSG_NOT_FOUND)
                 red_not_found.append((row, fio_cell.value))
 
                 if parent:
@@ -325,12 +351,19 @@ def run_check(
         if len(records) > 1:
             fio_cell.fill = yellow_fill
             elloyy_dublicate[(row, fio_norm, fio_value, pos_or_eararchy_value)] = records
+            _write_comment(
+                ws,
+                row,
+                new_col_comment_index,
+                MSG_DUP_STEP1 if check_duplicates else MSG_DUP_STEP1_NO_CHECK,
+            )
             continue
 
         # 🟠 Одна запись и уволен → оранжевый
         if check_dismissed and is_dismissed(records[0]):
             fio_cell.fill = orange_fill
             orange_dismissed.append(str(fio_value))
+            _write_comment(ws, row, new_col_comment_index, MSG_DISMISSED)
 
         _write_sprav_columns(
             ws, row, records[0], new_col_hierarchy_index, new_col_position_index
@@ -365,10 +398,13 @@ def run_check(
         # Шаг 2: жёлтый/зелёный в следующей колонке (ФИО остаётся жёлтым)
         paint_rows_by_dict(ws, new_d, yellow_fill, fio_col_index + 1)
         paint_rows_by_dict(ws, not_d, green_fill, fio_col_index + 1)
+        _comment_rows(ws, new_d, new_col_comment_index, MSG_DUP_STEP2_YELLOW)
+        _comment_rows(ws, not_d, new_col_comment_index, MSG_DUP_STEP2_GREEN)
         write_position_eararchi(ws, not_d, new_col_hierarchy_index, new_col_position_index)
 
         # Все отфильтрованные как неактивные → оранжевый на ФИО
         paint_rows_by_dict(ws, dismissed_dups, orange_fill, fio_col_index)
+        _comment_rows(ws, dismissed_dups, new_col_comment_index, MSG_DUP_ALL_DISMISSED)
         for (row_idx, _, _, _), records in dismissed_dups.items():
             _write_sprav_columns(
                 ws, row_idx, records[0], new_col_hierarchy_index, new_col_position_index
@@ -379,6 +415,8 @@ def run_check(
         # Шаг 3: жёлтый/зелёный во второй следующей колонке
         paint_rows_by_dict(ws, remaining_d, yellow_fill, fio_col_index + 2)
         paint_rows_by_dict(ws, resolved_full, green_fill, fio_col_index + 2)
+        _comment_rows(ws, remaining_d, new_col_comment_index, MSG_DUP_STEP3_YELLOW)
+        _comment_rows(ws, resolved_full, new_col_comment_index, MSG_DUP_STEP3_GREEN)
         write_position_eararchi(ws, resolved_full, new_col_hierarchy_index, new_col_position_index)
 
         write(
@@ -410,9 +448,11 @@ def run_check(
                 elif choice is not None:
                     write(f"Выбрана актуальная запись: {choice}")
                     fill = orange_fill if is_dismissed(choice) else green_fill
+                    comment = MSG_DUP_MANUAL_DISMISSED if is_dismissed(choice) else MSG_DUP_MANUAL_ACTIVE
                     for (r, fn, _, _), _recs in list(remaining_d.items()):
                         if fn == fio_norm:
                             ws.cell(row=r, column=fio_col_index + 2).fill = fill
+                            _write_comment(ws, r, new_col_comment_index, comment)
                             _write_sprav_columns(
                                 ws,
                                 r,

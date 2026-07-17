@@ -782,5 +782,62 @@ def test_writes_department_and_position_from_sprav(monkeypatch):
 
     assert ws["C1"].value == "Подразделение"
     assert ws["D1"].value == "Штатная должность (справочник)"
+    assert ws["E1"].value == "Комментарий"
     assert ws["C2"].value == "Отдел АСУ"
     assert ws["D2"].value == "Инженер"
+    assert ws["E2"].value in (None, "")
+
+
+def test_writes_comment_for_missing_employee(monkeypatch):
+    sprav_df = pd.DataFrame(
+        [
+            {
+                "ФИО": "Иванов Иван Иванович",
+                "Штатная должность": "Инженер",
+                "Статус занятости": "работает",
+                "Увольн.": "31.12.9999",
+            }
+        ]
+    )
+    wb, ws = _make_check_wb(
+        [
+            ("Иванов И. И.", "IT"),
+            ("Петров П. П.", "HR"),
+        ]
+    )
+    _patch_io(monkeypatch, sprav_df, wb, ws)
+
+    run_check(
+        "sprav.xlsx",
+        "check.xlsx",
+        "out.xlsx",
+        check_dismissed=False,
+        check_duplicates=False,
+    )
+
+    assert ws["E3"].value == "Не найден в справочнике"
+
+
+def test_writes_comment_for_dismissed_employee(monkeypatch):
+    sprav_df = pd.DataFrame(
+        [
+            {
+                "ФИО": "Сидоров Сидор Сидорович",
+                "Штатная должность": "Интеграция: штатная должность по умолч.",
+                "Статус занятости": "уволился",
+                "Увольн.": "01.01.2020",
+            }
+        ]
+    )
+    wb, ws = _make_check_wb([("Сидоров Сидор Сидорович", "IT")])
+    _patch_io(monkeypatch, sprav_df, wb, ws)
+
+    run_check(
+        "sprav.xlsx",
+        "check.xlsx",
+        "out.xlsx",
+        check_dismissed=True,
+        check_duplicates=False,
+    )
+
+    assert ws["E2"].value == "Сотрудник уволен или неактивен"
