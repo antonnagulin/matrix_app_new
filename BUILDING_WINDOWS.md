@@ -1,42 +1,61 @@
 # Как скомпилировать программу под Windows (PyInstaller)
 
 ## 1. Требования
-- Windows 10/11 x64
-- Python **3.12** (рекомендуется x64)
-- Установленные зависимости проекта
+- Windows 10/11 **x64**
+- Python **3.12 x64** (не 32-bit)
+- [Microsoft Visual C++ 2015–2022 Redistributable (x64)](https://aka.ms/vs/17/release/vc_redist.x64.exe)
 
 ## 2. Установите зависимости
-Вариант A (через Poetry):
+
 ```powershell
-cd z:\programs\matrix_applications
+cd C:\Users\User\programs\matrix_applications
 poetry install
 poetry run python -m src.main
 ```
 
-Вариант B (без Poetry) — если используете pip напрямую:
+Если без Poetry:
+
 ```powershell
-cd z:\programs\matrix_applications
 pip install -U pip
 pip install "pandas>=3,<4" "openpyxl>=3.1.5,<4" "tqdm>=4.67,<5" "xlrd>=2,<3" "tabulate>=0.10,<0.11"
 ```
 
-## 3. Установите PyInstaller
-```powershell
-cd z:\programs\matrix_applications
-poetry run pip install pyinstaller
-```
+## 3. Сборка exe
 
-## 4. Сборка exe
-Запустите скрипт:
 ```powershell
-cd z:\programs\matrix_applications
+cd C:\Users\User\programs\matrix_applications
 build_windows_pyinstaller.bat
 ```
 
-После успешной сборки exe будет в:
-- `dist\matrix-check\matrix-check.exe`
+## 4. Где exe
 
-## 5. Если не собралось с первого раза
-1) Попробуйте собрать в `--onedir` (уже используется в скрипте).  
-2) Если PyInstaller ругается на скрытые импорты, скажите мне текст ошибки — подскажу, какие `--hidden-import` добавить.
+После успешной сборки запускайте **только**:
 
+```
+dist\matrix-check\matrix-check.exe
+```
+
+Важно:
+- **НЕ** запускайте exe из папки `build\` — там временные файлы, оттуда и ошибка `Failed to load Python DLL`.
+- При переносе на другой ПК копируйте **всю папку** `dist\matrix-check\`, а не один `.exe`.
+
+## 5. Ошибка `Failed to load Python DLL`
+
+1. Запускайте из `dist\matrix-check\`, не из `build\`.
+2. Установите **VC++ Redistributable x64** (ссылка выше).
+3. Пересоберите:
+   ```powershell
+   build_windows_pyinstaller.bat
+   ```
+4. Убедитесь, что Python **64-bit**:
+   ```powershell
+   python -c "import struct; print(struct.calcsize('P')*8)"
+   ```
+   Должно вывести `64`.
+
+## 6. Ручная сборка (если нужно)
+
+```powershell
+poetry run python -m pip install -U pyinstaller
+poetry run python -m PyInstaller --clean --noconfirm matrix-check.spec
+```

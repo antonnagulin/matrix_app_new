@@ -17,3 +17,4 @@ tresh/test.py
 dist/
 build/
 *.spec
+!matrix-check.spec
