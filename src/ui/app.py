@@ -35,6 +35,8 @@ class EmployeeCheckApp:
   """Проверка сотрудников по Excel-справочнику."""
 
   WINDOW_TITLE = "Проверка сотрудников"
+  DEFAULT_WIDTH = 1000
+  DEFAULT_HEIGHT = 720
   MIN_WIDTH = 860
   MIN_HEIGHT = 640
 
@@ -64,26 +66,14 @@ class EmployeeCheckApp:
     self.root.title(self.WINDOW_TITLE)
     self.root.minsize(self.MIN_WIDTH, self.MIN_HEIGHT)
     self.root.configure(bg=COLORS["bg"])
+    self._center_window(self.DEFAULT_WIDTH, self.DEFAULT_HEIGHT)
 
-    if sys.platform == "win32":
-      try:
-        self.root.state("zoomed")
-      except tk.TclError:
-        self.root.geometry("1000x720")
-    else:
-      self.root.geometry("1000x720")
-
-    self._center_if_needed()
-
-  def _center_if_needed(self) -> None:
-    if self.root.state() == "zoomed":
-      return
+  def _center_window(self, width: int, height: int) -> None:
+    self.root.geometry(f"{width}x{height}")
     self.root.update_idletasks()
-    w = self.root.winfo_width()
-    h = self.root.winfo_height()
-    x = (self.root.winfo_screenwidth() // 2) - (w // 2)
-    y = (self.root.winfo_screenheight() // 2) - (h // 2)
-    self.root.geometry(f"{w}x{h}+{x}+{y}")
+    x = (self.root.winfo_screenwidth() - width) // 2
+    y = (self.root.winfo_screenheight() - height) // 2
+    self.root.geometry(f"{width}x{height}+{max(x, 0)}+{max(y, 0)}")
 
   def _build_ui(self) -> None:
     self._build_header()
