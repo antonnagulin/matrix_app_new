@@ -99,8 +99,8 @@ MSG_DUP_STEP2_GREEN = "Дубликат разрешён после 1-й про�
 MSG_DUP_STEP3_YELLOW = "Дубликат не разрешён после 2-й проверки (шаг 3)"
 MSG_DUP_STEP3_GREEN = "Дубликат разрешён по полному ФИО (шаг 3)"
 MSG_DUP_ALL_DISMISSED = "Все записи дубликата уволены"
-MSG_DUP_MANUAL_ACTIVE = "Дубликат выбран вручную — активная запись"
-MSG_DUP_MANUAL_DISMISSED = "Дубликат выбран вручную — уволенная запись"
+MSG_DUP_MANUAL_ACTIVE = "Дубликат выбран вручную (шаг 3)"
+MSG_DUP_MANUAL_DISMISSED = "Дубликат выбран вручную — уволенная запись (шаг 3)"
 
 
 def _record_as_dict(record) -> dict:
@@ -451,7 +451,8 @@ def run_check(
                     comment = MSG_DUP_MANUAL_DISMISSED if is_dismissed(choice) else MSG_DUP_MANUAL_ACTIVE
                     for (r, fn, _, _), _recs in list(remaining_d.items()):
                         if fn == fio_norm:
-                            ws.cell(row=r, column=fio_col_index + 2).fill = fill
+                            # жёлтый / жёлтый / жёлтый / зелёный (или оранжевый)
+                            ws.cell(row=r, column=fio_col_index + 3).fill = fill
                             _write_comment(ws, r, new_col_comment_index, comment)
                             _write_sprav_columns(
                                 ws,

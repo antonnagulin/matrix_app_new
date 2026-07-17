@@ -340,8 +340,9 @@ def test_duplicates_logged_and_selection_called(monkeypatch):
     assert selected["count"] == 2
     assert "Дубликаты в справочнике для" in log.text()
     assert "Выбрана актуальная запись" in log.text()
-    assert GREEN_FILL_COLOR in (ws["C2"].fill.start_color.rgb or "")
-    assert ELOYY_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+    assert GREEN_FILL_COLOR in (ws["D2"].fill.start_color.rgb or "")
+    assert ELOYY_FILL_COLOR in (ws["C2"].fill.start_color.rgb or "")
+    assert ws["E2"].value == "Дубликат выбран вручную (шаг 3)"
 
 
 def test_skip_all_duplicates_skips_remaining_prompts(monkeypatch):

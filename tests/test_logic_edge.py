@@ -117,8 +117,11 @@ def test_duplicate_choice_marks_green(monkeypatch):
         parent=object(),
     )
 
-    assert GREEN_FILL_COLOR in (ws["C2"].fill.start_color.rgb or "")
+    assert GREEN_FILL_COLOR in (ws["D2"].fill.start_color.rgb or "")
     assert ELOYY_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+    assert ELOYY_FILL_COLOR in (ws["B2"].fill.start_color.rgb or "")
+    assert ELOYY_FILL_COLOR in (ws["C2"].fill.start_color.rgb or "")
+    assert ws["E2"].value == "Дубликат выбран вручную (шаг 3)"
 
 
 def test_duplicate_choice_marks_orange_when_dismissed(monkeypatch):
@@ -161,8 +164,10 @@ def test_duplicate_choice_marks_orange_when_dismissed(monkeypatch):
         parent=object(),
     )
 
-    assert ORANGE_FILL_COLOR in (ws["C2"].fill.start_color.rgb or "")
+    assert ORANGE_FILL_COLOR in (ws["D2"].fill.start_color.rgb or "")
     assert ELOYY_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+    assert ELOYY_FILL_COLOR in (ws["C2"].fill.start_color.rgb or "")
+    assert ws["E2"].value == "Дубликат выбран вручную — уволенная запись (шаг 3)"
 
 
 def test_skip_all_constant_value():
