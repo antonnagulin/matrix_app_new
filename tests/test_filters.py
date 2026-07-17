@@ -151,3 +151,7 @@ class TestJoinWithSlash:
 
     def test_empty_row(self):
         assert join_with_slash({}) == ""
+
+    def test_falls_back_to_department_column(self):
+        row = {"Подразделение": "Отдел АСУ"}
+        assert join_with_slash(row) == "Отдел АСУ"

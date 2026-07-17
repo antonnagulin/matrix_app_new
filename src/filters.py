@@ -78,6 +78,8 @@ def is_dismissed(record: dict) -> bool:
 
 
 def join_with_slash(row):
+    if hasattr(row, "to_dict"):
+        row = row.to_dict()
     parts = [
         row.get("Орг. единица уровня 1", ""),
         row.get("Орг. единица уровня 2", ""),
@@ -85,4 +87,9 @@ def join_with_slash(row):
         row.get("Орг. единица уровня 4", ""),
     ]
     parts = [str(p).strip() for p in parts if pd.notna(p) and str(p).strip()]
-    return " / ".join(parts)
+    if parts:
+        return " / ".join(parts)
+    dept = row.get("Подразделение", "")
+    if pd.notna(dept) and str(dept).strip():
+        return str(dept).strip()
+    return ""

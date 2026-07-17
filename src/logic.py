@@ -1,4 +1,4 @@
-from .filters import normalize_fio, is_dismissed
+from .filters import normalize_fio, is_dismissed, join_with_slash
 from .file_utils import (
     read_sprav_file,
     load_check_file,
@@ -16,6 +16,7 @@ from .constants import (
 )
 from .check_duplicate import check_duplicate, second_check_duplicate
 from .paint_row_for_dict import paint_rows_by_dict
+from .write_position_eararchi import write_position_eararchi
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -84,6 +85,21 @@ def ask_include_missing(parent, fio: str) -> str:
 
 
 SKIP_ALL_DUPLICATES = "skip_all"
+
+COL_HIERARCHY_NAME = "Подразделение"
+COL_POSITION_NAME = "Штатная должность (справочник)"
+
+
+def _record_as_dict(record) -> dict:
+    if hasattr(record, "to_dict"):
+        return record.to_dict()
+    return dict(record)
+
+
+def _write_sprav_columns(ws, row: int, record, hierarchy_col: int, position_col: int) -> None:
+    rec = _record_as_dict(record)
+    ws.cell(row=row, column=hierarchy_col, value=join_with_slash(rec))
+    ws.cell(row=row, column=position_col, value=rec.get("Штатная должность", ""))
 
 
 def choose_actual_record(parent, fio, records):
@@ -231,6 +247,16 @@ def run_check(
         )
     data_start = header_row + 1
 
+    # ====== Колонки из справочника (как в исходной версии) ======
+    last_col = len(headers)
+    ws.insert_cols(last_col + 1)
+    ws.cell(row=header_row, column=last_col + 1, value=COL_HIERARCHY_NAME)
+    ws.insert_cols(last_col + 2)
+    ws.cell(row=header_row, column=last_col + 2, value=COL_POSITION_NAME)
+    new_col_hierarchy_index = last_col + 1
+    new_col_position_index = last_col + 2
+    headers = headers + [COL_HIERARCHY_NAME, COL_POSITION_NAME]
+
     red_fill = get_fill(RED_FILL_COLOR)
     orange_fill = get_fill(ORANGE_FILL_COLOR)
     yellow_fill = get_fill(ELOYY_FILL_COLOR)
@@ -266,6 +292,8 @@ def run_check(
         if fio_norm not in fio_dict:
             if fio_norm not in repit_not_found:
                 fio_cell.fill = red_fill
+                ws.cell(row=row, column=new_col_hierarchy_index, value="")
+                ws.cell(row=row, column=new_col_position_index, value="")
                 red_not_found.append((row, fio_cell.value))
 
                 if parent:
@@ -304,6 +332,10 @@ def run_check(
             fio_cell.fill = orange_fill
             orange_dismissed.append(str(fio_value))
 
+        _write_sprav_columns(
+            ws, row, records[0], new_col_hierarchy_index, new_col_position_index
+        )
+
     # ====== Новый XLSX для выбранных красных ======
     if include_in_report:
         new_wb = openpyxl.Workbook()
@@ -333,12 +365,17 @@ def run_check(
         # Сохраняем жёлтый на ФИО у ещё неоднозначных; зелёный — у однозначно найденных
         paint_rows_by_dict(ws, new_d, yellow_fill, fio_col_index)
         paint_rows_by_dict(ws, not_d, green_fill, fio_col_index)
+        write_position_eararchi(ws, not_d, new_col_hierarchy_index, new_col_position_index)
         # Соседние колонки — как в исходном варианте
         paint_rows_by_dict(ws, new_d, yellow_fill, fio_col_index + 1)
         paint_rows_by_dict(ws, not_d, green_fill, fio_col_index + 1)
 
         # Все отфильтрованные как неактивные → оранжевый
         paint_rows_by_dict(ws, dismissed_dups, orange_fill, fio_col_index)
+        for (row_idx, _, _, _), records in dismissed_dups.items():
+            _write_sprav_columns(
+                ws, row_idx, records[0], new_col_hierarchy_index, new_col_position_index
+            )
 
         resolved_count = len(not_d)
         remaining_d, resolved_full = second_check_duplicate(new_d)
@@ -346,6 +383,7 @@ def run_check(
         paint_rows_by_dict(ws, resolved_full, green_fill, fio_col_index + 2)
         # Уточнённые полным ФИО — перекрашиваем и колонку ФИО
         paint_rows_by_dict(ws, resolved_full, green_fill, fio_col_index)
+        write_position_eararchi(ws, resolved_full, new_col_hierarchy_index, new_col_position_index)
 
         write(
             f"Дубликаты: осталось неоднозначных={len(remaining_d)}, "
@@ -379,6 +417,13 @@ def run_check(
                     for (r, fn, _, _), _recs in list(remaining_d.items()):
                         if fn == fio_norm:
                             ws.cell(row=r, column=fio_col_index).fill = fill
+                            _write_sprav_columns(
+                                ws,
+                                r,
+                                choice,
+                                new_col_hierarchy_index,
+                                new_col_position_index,
+                            )
         if remaining_d and skip_duplicate_selection and not prompt_duplicate_selection:
             write("Дубликаты записаны в журнал без ручного выбора.")
     elif check_duplicates:

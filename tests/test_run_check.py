@@ -726,6 +726,7 @@ def test_header_row_manual_override(monkeypatch):
                 "Штатная должность": "Инженер",
                 "Статус занятости": "работает",
                 "Увольн.": "31.12.9999",
+                "Подразделение": "Отдел АСУ",
             }
         ]
     )
@@ -752,3 +753,32 @@ def test_header_row_manual_override(monkeypatch):
 
     assert "Строка заголовков задана вручную: 5" in log.text()
     assert RED_FILL_COLOR in (ws["A6"].fill.start_color.rgb or "")
+
+
+def test_writes_department_and_position_from_sprav(monkeypatch):
+    sprav_df = pd.DataFrame(
+        [
+            {
+                "ФИО": "Иванов Иван Иванович",
+                "Штатная должность": "Инженер",
+                "Статус занятости": "работает",
+                "Увольн.": "31.12.9999",
+                "Подразделение": "Отдел АСУ",
+            }
+        ]
+    )
+    wb, ws = _make_check_wb([("Иванов И. И.", "IT")])
+    _patch_io(monkeypatch, sprav_df, wb, ws)
+
+    run_check(
+        "sprav.xlsx",
+        "check.xlsx",
+        "out.xlsx",
+        check_dismissed=False,
+        check_duplicates=False,
+    )
+
+    assert ws["C1"].value == "Подразделение"
+    assert ws["D1"].value == "Штатная должность (справочник)"
+    assert ws["C2"].value == "Отдел АСУ"
+    assert ws["D2"].value == "Инженер"
