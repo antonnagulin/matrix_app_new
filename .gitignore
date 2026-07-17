@@ -18,3 +18,4 @@ dist/
 build/
 *.spec
 !matrix-check.spec
+!matrix-check-linux.spec

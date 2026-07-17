@@ -5,7 +5,7 @@ description = ""
 authors = [
     {name = "antonnagulin",email = "nagulin03@mail.ru"}
 ]
-requires-python = ">=3.12,<3.16"
+requires-python = ">=3.11,<3.16"
 dependencies = [
     "pandas (>=3.0.0,<4.0.0)",
     "openpyxl (>=3.1.5,<4.0.0)",

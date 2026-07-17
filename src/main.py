@@ -1,15 +1,15 @@
-"""Точка входа: запуск Windows-приложения."""
+"""Точка входа: запуск GUI-приложения."""
 
 import tkinter as tk
 
+from src.platform_utils import configure_gui_root, setup_gui_platform
 from src.ui import EmployeeCheckApp
-from src.win_dpi import configure_tk_scaling, enable_dpi_awareness
 
 
 def main() -> None:
-    enable_dpi_awareness()
+    setup_gui_platform()
     root = tk.Tk()
-    configure_tk_scaling(root)
+    configure_gui_root(root)
     EmployeeCheckApp(root)
     root.mainloop()
 

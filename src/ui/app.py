@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import os
-import sys
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from src.logic import run_check
 from src.file_utils import peek_sheet_rows
+from src.platform_utils import open_folder
 from src.ui.styles import COLORS, FONT_FAMILY, setup_styles
 
 
@@ -563,9 +562,7 @@ class EmployeeCheckApp:
       messagebox.showwarning(self.WINDOW_TITLE, "Папка результата пока недоступна.", parent=self.root)
       return
 
-    if sys.platform == "win32":
-      os.startfile(folder)  # noqa: S606
-    else:
+    if not open_folder(folder):
       messagebox.showinfo(self.WINDOW_TITLE, folder, parent=self.root)
 
   def _on_close(self) -> None:

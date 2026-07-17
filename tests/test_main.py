@@ -6,6 +6,8 @@ from unittest.mock import MagicMock, patch
 def test_main_starts_app_and_runs_loop():
     mock_root = MagicMock()
     with patch("src.main.tk.Tk", return_value=mock_root), patch(
+        "src.main.setup_gui_platform"
+    ), patch("src.main.configure_gui_root"), patch(
         "src.main.EmployeeCheckApp"
     ) as mock_app_cls:
         from src.main import main

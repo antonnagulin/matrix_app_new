@@ -24,7 +24,13 @@ COLORS = {
     "header_fg": "#ffffff",
 }
 
-FONT_FAMILY = "Segoe UI" if sys.platform == "win32" else "Arial"
+FONT_FAMILY = (
+    "Segoe UI"
+    if sys.platform == "win32"
+    else "DejaVu Sans"
+    if sys.platform == "linux"
+    else "Arial"
+)
 
 
 def setup_styles(root: tk.Tk) -> ttk.Style:
@@ -35,6 +41,9 @@ def setup_styles(root: tk.Tk) -> ttk.Style:
             if theme in style.theme_names():
                 style.theme_use(theme)
                 break
+    else:
+        if "clam" in style.theme_names():
+            style.theme_use("clam")
 
     style.configure(".", font=(FONT_FAMILY, 10))
     style.configure("TFrame", background=COLORS["bg"])
