@@ -1,6 +1,22 @@
 from .filters import normalize_fio, is_dismissed
-from .file_utils import read_sprav_file, load_check_file, save_file, get_fill
-from .constants import FIO_COL, RED_FILL_COLOR, ORANGE_FILL_COLOR
+from .file_utils import (
+    read_sprav_file,
+    load_check_file,
+    save_file,
+    get_fill,
+    find_header_row,
+    row_values,
+)
+from .constants import (
+    FIO_COL,
+    RED_FILL_COLOR,
+    ORANGE_FILL_COLOR,
+    ELOYY_FILL_COLOR,
+    GREEN_FILL_COLOR,
+)
+from .check_duplicate import check_duplicate, second_check_duplicate
+from .paint_row_for_dict import paint_rows_by_dict
+from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
 import openpyxl
@@ -14,6 +30,7 @@ def ask_include_missing(parent, fio: str) -> str:
         'yes' — только этого сотрудника
         'no' — не включать
         'yes_all' — этого и всех следующих отсутствующих
+        'no_all' — не включать этого и всех следующих отсутствующих
     """
     result = ["no"]
 
@@ -27,6 +44,10 @@ def ask_include_missing(parent, fio: str) -> str:
 
     def on_yes_all() -> None:
         result[0] = "yes_all"
+        win.destroy()
+
+    def on_no_all() -> None:
+        result[0] = "no_all"
         win.destroy()
 
     win = tk.Toplevel(parent)
@@ -50,7 +71,8 @@ def ask_include_missing(parent, fio: str) -> str:
 
     ttk.Button(btn_frame, text="Да", command=on_yes, width=12).pack(side="left", padx=(0, 6))
     ttk.Button(btn_frame, text="Нет", command=on_no, width=12).pack(side="left", padx=(0, 6))
-    ttk.Button(btn_frame, text="Да для всех", command=on_yes_all, width=14).pack(side="left")
+    ttk.Button(btn_frame, text="Да для всех", command=on_yes_all, width=14).pack(side="left", padx=(0, 6))
+    ttk.Button(btn_frame, text="Нет для всех", command=on_no_all, width=14).pack(side="left")
 
     win.update_idletasks()
     px = parent.winfo_rootx() + (parent.winfo_width() - win.winfo_width()) // 2
@@ -162,6 +184,7 @@ def run_check(
     check_dismissed=True,
     check_duplicates=True,
     prompt_duplicate_selection=True,
+    header_row=None,
     log=None,
     parent=None
 ):
@@ -185,27 +208,55 @@ def run_check(
 
     # ====== Загрузка файла проверки ======
     wb, ws = load_check_file(check_file)
-    headers = [cell.value for cell in ws[1]]
-    fio_col_index = headers.index(FIO_COL) + 1
+    if header_row is None:
+        header_row = find_header_row(ws)
+        write(f"Строка заголовков определена автоматически: {header_row}")
+    else:
+        header_row = int(header_row)
+        write(f"Строка заголовков задана вручную: {header_row}")
+
+    raw_headers = row_values(ws, header_row)
+    headers = [str(v).strip() if v is not None and str(v).strip() != "" else v for v in raw_headers]
+
+    fio_col_index = None
+    for idx, h in enumerate(headers, start=1):
+        if h is not None and str(h).strip().casefold() == FIO_COL.casefold():
+            headers[idx - 1] = FIO_COL
+            fio_col_index = idx
+            break
+    if fio_col_index is None:
+        raise ValueError(
+            f"В строке {header_row} нет колонки «{FIO_COL}». "
+            "Выберите другую строку заголовков."
+        )
+    data_start = header_row + 1
 
     red_fill = get_fill(RED_FILL_COLOR)
     orange_fill = get_fill(ORANGE_FILL_COLOR)
+    yellow_fill = get_fill(ELOYY_FILL_COLOR)
+    green_fill = get_fill(GREEN_FILL_COLOR)
 
     write("Проверка сотрудников...")
 
     # ====== Списки ======
     red_not_found = []       # отсутствующие
-    orange_dismissed = []    # уволенные
+    orange_dismissed = []    # уволенные (одна запись в справочнике)
+    elloyy_dublicate = {}    # дубликаты: (row, fio_norm, fio_value, next_col) -> записи
     include_in_report = []   # выбранные красные
     repit_not_found = set()
 
     include_all_missing = False
+    exclude_all_missing = False
+    output_path = Path(output_file)
+    report_path = output_path.with_name(f"{output_path.stem}_included.xlsx")
+    report_file = str(report_path)
 
     # ====== Первый проход ======
-    for row in range(2, ws.max_row + 1):
+    for row in range(data_start, ws.max_row + 1):
         fio_cell = ws.cell(row=row, column=fio_col_index)
         fio_value = fio_cell.value
         fio_norm = normalize_fio(fio_value)
+        pos_or_eararchy_value = ws.cell(row=row, column=fio_col_index + 1).value
 
         # Игнорируем пустые строки
         if not fio_value or str(fio_value).strip() == "":
@@ -218,27 +269,40 @@ def run_check(
                 red_not_found.append((row, fio_cell.value))
 
                 if parent:
-                    if include_all_missing:
+                    if exclude_all_missing:
+                        write(f"  {fio_cell.value} — не включён в отчёт")
+                    elif include_all_missing:
                         include_in_report.append(row)
                     else:
                         answer = ask_include_missing(parent, fio_cell.value)
                         if answer == "yes_all":
                             include_all_missing = True
                             include_in_report.append(row)
+                        elif answer == "no_all":
+                            exclude_all_missing = True
+                            write(f"  {fio_cell.value} — не включён в отчёт")
                         elif answer == "yes":
                             include_in_report.append(row)
+                        else:
+                            write(f"  {fio_cell.value} — не включён в отчёт")
 
                 repit_not_found.add(fio_norm)
-            elif include_all_missing:
+            elif include_all_missing and not exclude_all_missing:
                 include_in_report.append(row)
             continue
 
-        # 🟠 Проверка увольнения
-        if check_dismissed:
-            records = fio_dict[fio_norm]
-            if any(is_dismissed(rec) for rec in records):
-                fio_cell.fill = orange_fill
-                orange_dismissed.append(str(fio_cell.value))
+        records = fio_dict[fio_norm]
+
+        # 🟡 Несколько записей в справочнике → жёлтый (дубликат)
+        if len(records) > 1:
+            fio_cell.fill = yellow_fill
+            elloyy_dublicate[(row, fio_norm, fio_value, pos_or_eararchy_value)] = records
+            continue
+
+        # 🟠 Одна запись и уволен → оранжевый
+        if check_dismissed and is_dismissed(records[0]):
+            fio_cell.fill = orange_fill
+            orange_dismissed.append(str(fio_value))
 
     # ====== Новый XLSX для выбранных красных ======
     if include_in_report:
@@ -249,9 +313,11 @@ def run_check(
         for i, row_idx in enumerate(include_in_report, start=2):
             for col_idx, header in enumerate(headers, start=1):
                 new_ws.cell(row=i, column=col_idx, value=ws.cell(row=row_idx, column=col_idx).value)
-        report_file = output_file.replace(".xlsx", "_included.xlsx")
-        new_wb.save(report_file)
+        new_wb.save(report_path)
         write(f"Сгенерирован файл с выбранными сотрудниками: {report_file}")
+    elif report_path.exists():
+        report_path.unlink()
+        write(f"Файл отчёта удалён — ни один сотрудник не включён: {report_file}")
 
     # ====== Лог: красные ======
     if red_not_found:
@@ -259,39 +325,69 @@ def run_check(
         for _, fio in red_not_found:
             write(f"  - {fio}")
 
-    # ====== Второй проход: дубликаты оранжевых ======
-    if check_duplicates:
-        write("\nПоиск дубликатов в справочнике (для уволенных)...")
-        seen = set()
-        found_any = False
+    # ====== Дубликаты: жёлтый / зелёный (как в исходной версии) ======
+    if check_duplicates and elloyy_dublicate:
+        write("\nРазбор дубликатов в справочнике...")
+        new_d, not_d, dismissed_dups = check_duplicate(elloyy_dublicate)
+
+        # Сохраняем жёлтый на ФИО у ещё неоднозначных; зелёный — у однозначно найденных
+        paint_rows_by_dict(ws, new_d, yellow_fill, fio_col_index)
+        paint_rows_by_dict(ws, not_d, green_fill, fio_col_index)
+        # Соседние колонки — как в исходном варианте
+        paint_rows_by_dict(ws, new_d, yellow_fill, fio_col_index + 1)
+        paint_rows_by_dict(ws, not_d, green_fill, fio_col_index + 1)
+
+        # Все отфильтрованные как неактивные → оранжевый
+        paint_rows_by_dict(ws, dismissed_dups, orange_fill, fio_col_index)
+
+        resolved_count = len(not_d)
+        remaining_d, resolved_full = second_check_duplicate(new_d)
+        paint_rows_by_dict(ws, remaining_d, yellow_fill, fio_col_index + 2)
+        paint_rows_by_dict(ws, resolved_full, green_fill, fio_col_index + 2)
+        # Уточнённые полным ФИО — перекрашиваем и колонку ФИО
+        paint_rows_by_dict(ws, resolved_full, green_fill, fio_col_index)
+
+        write(
+            f"Дубликаты: осталось неоднозначных={len(remaining_d)}, "
+            f"однозначно найдено={resolved_count + len(resolved_full)}, "
+            f"только уволенные={len(dismissed_dups)}"
+        )
+
+        # Диалог выбора — только для оставшихся неоднозначных
         skip_duplicate_selection = not prompt_duplicate_selection
-        for fio in sorted(set(orange_dismissed)):
-            fio_norm = normalize_fio(fio)
-            records = fio_dict.get(fio_norm, [])
-            if len(records) > 1 and fio_norm not in seen:
-                seen.add(fio_norm)
-                found_any = True
-                write("\n" + "="*90)
-                write(f"Дубликаты в справочнике для: {fio}")
-                write("="*90)
+        seen = set()
+        for (row_idx, fio_norm, fio_value, _), records in remaining_d.items():
+            if fio_norm in seen:
+                continue
+            seen.add(fio_norm)
+            write("\n" + "=" * 90)
+            write(f"Дубликаты в справочнике для: {fio_value}")
+            write("=" * 90)
+            for idx, rec in enumerate(records, start=1):
+                write(f"\nЗапись #{idx}")
+                for col, value in rec.items():
+                    write(f"  {col}: {value}")
 
-                for idx, rec in enumerate(records, start=1):
-                    write(f"\nЗапись #{idx}")
-                    for col, value in rec.items():
-                        write(f"  {col}: {value}")
-
-                if parent and not skip_duplicate_selection:
-                    choice = choose_actual_record(parent, fio, records)
-                    if choice is SKIP_ALL_DUPLICATES:
-                        skip_duplicate_selection = True
-                        write("Дальнейший выбор дубликатов пропущен — отчёт сформирован без ручного выбора.")
-                    elif choice is not None:
-                        write(f"Выбрана актуальная запись: {choice}")
-
-        if not found_any:
-            write("Дубликатов не найдено")
-        elif skip_duplicate_selection and not prompt_duplicate_selection:
+            if parent and not skip_duplicate_selection:
+                choice = choose_actual_record(parent, fio_value, records)
+                if choice is SKIP_ALL_DUPLICATES:
+                    skip_duplicate_selection = True
+                    write("Дальнейший выбор дубликатов пропущен — отчёт сформирован без ручного выбора.")
+                elif choice is not None:
+                    write(f"Выбрана актуальная запись: {choice}")
+                    fill = orange_fill if is_dismissed(choice) else green_fill
+                    for (r, fn, _, _), _recs in list(remaining_d.items()):
+                        if fn == fio_norm:
+                            ws.cell(row=r, column=fio_col_index).fill = fill
+        if remaining_d and skip_duplicate_selection and not prompt_duplicate_selection:
             write("Дубликаты записаны в журнал без ручного выбора.")
+    elif check_duplicates:
+        write("\nДубликатов не найдено")
+
+    if orange_dismissed:
+        write("\nСотрудники, помеченные как уволенные (оранжевым):")
+        for fio in sorted(set(orange_dismissed)):
+            write(f"  - {fio}")
 
     # ====== Сохранение файла с подсветкой ======
     save_file(wb, output_file)

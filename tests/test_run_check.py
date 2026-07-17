@@ -3,7 +3,7 @@ import pandas as pd
 import openpyxl
 
 from src.logic import run_check, SKIP_ALL_DUPLICATES
-from src.constants import RED_FILL_COLOR, ORANGE_FILL_COLOR
+from src.constants import RED_FILL_COLOR, ORANGE_FILL_COLOR, ELOYY_FILL_COLOR, GREEN_FILL_COLOR
 
 
 class DummyLog:
@@ -296,19 +296,20 @@ def test_yes_all_includes_subsequent_missing_without_prompt(monkeypatch, tmp_pat
 
 
 def test_duplicates_logged_and_selection_called(monkeypatch):
+    # Два активных дубликата — остаются неоднозначными, нужен выбор
     sprav_df = pd.DataFrame(
         [
             {
                 "ФИО": "Иванов Иван Иванович",
                 "Штатная должность": "Инженер",
                 "Статус занятости": "работает",
-                "Увольн.": "01.01.2020",
+                "Увольн.": "31.12.9999",
             },
             {
                 "ФИО": "Иванов Иван Иванович",
-                "Штатная должность": "Интеграция: штатная должность по умолч.",
-                "Статус занятости": "уволился",
-                "Увольн.": "01.01.2019",
+                "Штатная должность": "Менеджер",
+                "Статус занятости": "работает",
+                "Увольн.": "31.12.9999",
             },
         ]
     )
@@ -339,6 +340,7 @@ def test_duplicates_logged_and_selection_called(monkeypatch):
     assert selected["count"] == 2
     assert "Дубликаты в справочнике для" in log.text()
     assert "Выбрана актуальная запись" in log.text()
+    assert GREEN_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
 
 
 def test_skip_all_duplicates_skips_remaining_prompts(monkeypatch):
@@ -348,25 +350,25 @@ def test_skip_all_duplicates_skips_remaining_prompts(monkeypatch):
                 "ФИО": "Иванов Иван Иванович",
                 "Штатная должность": "Инженер",
                 "Статус занятости": "работает",
-                "Увольн.": "01.01.2020",
+                "Увольн.": "31.12.9999",
             },
             {
                 "ФИО": "Иванов Иван Иванович",
-                "Штатная должность": "Интеграция: штатная должность по умолч.",
-                "Статус занятости": "уволился",
-                "Увольн.": "01.01.2019",
-            },
-            {
-                "ФИО": "Петров Петр Петрович",
                 "Штатная должность": "Менеджер",
                 "Статус занятости": "работает",
-                "Увольн.": "01.01.2020",
+                "Увольн.": "31.12.9999",
             },
             {
                 "ФИО": "Петров Петр Петрович",
-                "Штатная должность": "Интеграция: штатная должность по умолч.",
-                "Статус занятости": "уволился",
-                "Увольн.": "01.01.2018",
+                "Штатная должность": "Аналитик",
+                "Статус занятости": "работает",
+                "Увольн.": "31.12.9999",
+            },
+            {
+                "ФИО": "Петров Петр Петрович",
+                "Штатная должность": "Юрист",
+                "Статус занятости": "работает",
+                "Увольн.": "31.12.9999",
             },
         ]
     )
@@ -407,13 +409,13 @@ def test_duplicates_logged_without_prompt_when_disabled(monkeypatch):
                 "ФИО": "Иванов Иван Иванович",
                 "Штатная должность": "Инженер",
                 "Статус занятости": "работает",
-                "Увольн.": "01.01.2020",
+                "Увольн.": "31.12.9999",
             },
             {
                 "ФИО": "Иванов Иван Иванович",
-                "Штатная должность": "Интеграция: штатная должность по умолч.",
-                "Статус занятости": "уволился",
-                "Увольн.": "01.01.2019",
+                "Штатная должность": "Менеджер",
+                "Статус занятости": "работает",
+                "Увольн.": "31.12.9999",
             },
         ]
     )
@@ -442,6 +444,7 @@ def test_duplicates_logged_without_prompt_when_disabled(monkeypatch):
     assert calls["count"] == 0
     assert "Дубликаты в справочнике для" in log.text()
     assert "Дубликаты записаны в журнал без ручного выбора." in log.text()
+    assert ELOYY_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
 
 
 def test_no_duplicates_message(monkeypatch):
@@ -498,6 +501,156 @@ def test_saves_output_file(monkeypatch):
     assert saved["wb"] is wb
 
 
+def test_no_answer_does_not_create_included_report(monkeypatch, tmp_path):
+    sprav_df = pd.DataFrame(
+        [
+            {
+                "ФИО": "Иванов Иван Иванович",
+                "Штатная должность": "Инженер",
+                "Статус занятости": "работает",
+                "Увольн.": "31.12.9999",
+            }
+        ]
+    )
+    wb, ws = _make_check_wb(
+        [
+            ("Фёдоров Ф. Ф.", "IT"),
+            ("Неизвестный Н. Н.", "HR"),
+        ]
+    )
+    output = tmp_path / "result.xlsx"
+    included = tmp_path / "result_included.xlsx"
+    included.write_bytes(b"stale")
+
+    monkeypatch.setattr("src.logic.ask_include_missing", lambda *_a, **_k: "no")
+    _patch_io(monkeypatch, sprav_df, wb, ws)
+
+    run_check(
+        "sprav.xlsx",
+        "check.xlsx",
+        str(output),
+        check_dismissed=False,
+        check_duplicates=False,
+        parent=object(),
+    )
+
+    assert not included.exists()
+
+
+def test_no_all_excludes_subsequent_missing(monkeypatch, tmp_path):
+    sprav_df = pd.DataFrame(
+        [
+            {
+                "ФИО": "Иванов Иван Иванович",
+                "Штатная должность": "Инженер",
+                "Статус занятости": "работает",
+                "Увольн.": "31.12.9999",
+            }
+        ]
+    )
+    wb, ws = _make_check_wb(
+        [
+            ("Первый Н. Н.", "IT"),
+            ("Второй В. В.", "HR"),
+        ]
+    )
+    output = tmp_path / "result.xlsx"
+    calls = {"count": 0}
+
+    def fake_ask(_parent, fio):
+        calls["count"] += 1
+        return "no_all" if fio == "Первый Н. Н." else "no"
+
+    monkeypatch.setattr("src.logic.ask_include_missing", fake_ask)
+    _patch_io(monkeypatch, sprav_df, wb, ws)
+
+    run_check(
+        "sprav.xlsx",
+        "check.xlsx",
+        str(output),
+        check_dismissed=False,
+        check_duplicates=False,
+        parent=object(),
+    )
+
+    assert calls["count"] == 1
+    assert not (tmp_path / "result_included.xlsx").exists()
+
+
+def test_mixed_duplicate_resolves_to_green(monkeypatch):
+    """Активная + уволенная запись → автоматически зелёный, без диалога."""
+    sprav_df = pd.DataFrame(
+        [
+            {
+                "ФИО": "Сидоров Сидор Сидорович",
+                "Штатная должность": "Аналитик",
+                "Статус занятости": "работает",
+                "Увольн.": "31.12.9999",
+            },
+            {
+                "ФИО": "Сидоров Сидор Сидорович",
+                "Штатная должность": "Интеграция: штатная должность по умолч.",
+                "Статус занятости": "уволился",
+                "Увольн.": "15.03.2023",
+            },
+        ]
+    )
+    wb, ws = _make_check_wb([("Сидоров С. С.", "IT")])
+    calls = {"count": 0}
+
+    def fake_choose(*_a, **_k):
+        calls["count"] += 1
+        return None
+
+    monkeypatch.setattr("src.logic.choose_actual_record", fake_choose)
+    _patch_io(monkeypatch, sprav_df, wb, ws)
+
+    run_check(
+        "sprav.xlsx",
+        "check.xlsx",
+        "out.xlsx",
+        check_dismissed=True,
+        check_duplicates=True,
+        parent=object(),
+    )
+
+    assert calls["count"] == 0
+    assert GREEN_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+
+
+def test_all_dismissed_duplicates_mark_orange(monkeypatch):
+    """Все записи дубликата уволены → оранжевый."""
+    sprav_df = pd.DataFrame(
+        [
+            {
+                "ФИО": "Сидоров Сидор Сидорович",
+                "Штатная должность": "Интеграция: штатная должность по умолч.",
+                "Статус занятости": "уволился",
+                "Увольн.": "15.03.2023",
+            },
+            {
+                "ФИО": "Сидоров Сидор Сидорович",
+                "Штатная должность": "Интеграция: штатная должность по умолч.",
+                "Статус занятости": "уволился",
+                "Увольн.": "01.01.2020",
+            },
+        ]
+    )
+    wb, ws = _make_check_wb([("Сидоров С. С.", "IT")])
+    _patch_io(monkeypatch, sprav_df, wb, ws)
+
+    run_check(
+        "sprav.xlsx",
+        "check.xlsx",
+        "out.xlsx",
+        check_dismissed=True,
+        check_duplicates=True,
+        prompt_duplicate_selection=False,
+    )
+
+    assert ORANGE_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+
+
 def test_active_employee_not_highlighted(monkeypatch):
     sprav_df = pd.DataFrame(
         [
@@ -523,3 +676,79 @@ def test_active_employee_not_highlighted(monkeypatch):
     fill = ws["A2"].fill.start_color.rgb or "00000000"
     assert RED_FILL_COLOR not in fill
     assert ORANGE_FILL_COLOR not in fill
+    assert ELOYY_FILL_COLOR not in fill
+
+
+def test_header_row_auto_detect_shifted(monkeypatch):
+    """Заголовки не в 1-й строке — автопоиск и проверка данных ниже."""
+    sprav_df = pd.DataFrame(
+        [
+            {
+                "ФИО": "Иванов Иван Иванович",
+                "Штатная должность": "Инженер",
+                "Статус занятости": "работает",
+                "Увольн.": "31.12.9999",
+            }
+        ]
+    )
+    wb = Workbook()
+    ws = wb.active
+    ws["A1"] = "Отчёт"
+    ws["A2"] = "Период 2026"
+    ws["A12"] = "ФИО"
+    ws["B12"] = "Отдел"
+    ws["A13"] = "Иванов И. И."
+    ws["B13"] = "IT"
+    ws["A14"] = "Петров П. П."
+    ws["B14"] = "HR"
+    log = DummyLog()
+    _patch_io(monkeypatch, sprav_df, wb, ws)
+
+    run_check(
+        "sprav.xlsx",
+        "check.xlsx",
+        "out.xlsx",
+        check_dismissed=False,
+        check_duplicates=False,
+        log=log,
+    )
+
+    assert "Строка заголовков определена автоматически: 12" in log.text()
+    assert RED_FILL_COLOR not in (ws["A13"].fill.start_color.rgb or "00000000")
+    assert RED_FILL_COLOR in (ws["A14"].fill.start_color.rgb or "")
+
+
+def test_header_row_manual_override(monkeypatch):
+    sprav_df = pd.DataFrame(
+        [
+            {
+                "ФИО": "Иванов Иван Иванович",
+                "Штатная должность": "Инженер",
+                "Статус занятости": "работает",
+                "Увольн.": "31.12.9999",
+            }
+        ]
+    )
+    wb = Workbook()
+    ws = wb.active
+    # Ложный «ФИО» в шапке + настоящие заголовки на 5-й
+    ws["A1"] = "ФИО отчёта (не таблица)"
+    ws["A5"] = "ФИО"
+    ws["B5"] = "Отдел"
+    ws["A6"] = "Неизвестный Н. Н."
+    ws["B6"] = "HR"
+    log = DummyLog()
+    _patch_io(monkeypatch, sprav_df, wb, ws)
+
+    run_check(
+        "sprav.xlsx",
+        "check.xlsx",
+        "out.xlsx",
+        check_dismissed=False,
+        check_duplicates=False,
+        header_row=5,
+        log=log,
+    )
+
+    assert "Строка заголовков задана вручную: 5" in log.text()
+    assert RED_FILL_COLOR in (ws["A6"].fill.start_color.rgb or "")

@@ -1,20 +1,20 @@
-from .filters import is_full_fio
+from .filters import is_full_fio, is_dismissed
+
 
 def check_duplicate(elloyy_dublicate: dict):
     new_elloyy_dublicate = {}
     not_elloyy_dublicate = {}
-    is_dismissed = {}
+    dismissed = {}
 
     for key, value in elloyy_dublicate.items():
         filtered = [
             inf for inf in value
-            if inf["Штатная должность"] != "Интеграция: штатная должность по умолч."
-            and inf["Группа сотрудников"] != "Внутренние совмест."
-            and inf["Статус занятости"] == "активный"
+            if str(inf.get("Группа сотрудников", "")).strip() != "Внутренние совмест."
+            and not is_dismissed(inf)
         ]
 
         if not filtered:
-            is_dismissed[key] = value
+            dismissed[key] = value
             continue
 
         if len(filtered) == 1:
@@ -22,7 +22,7 @@ def check_duplicate(elloyy_dublicate: dict):
         else:
             new_elloyy_dublicate[key] = filtered
 
-    return new_elloyy_dublicate, not_elloyy_dublicate, is_dismissed
+    return new_elloyy_dublicate, not_elloyy_dublicate, dismissed
 
 
 def second_check_duplicate(elloyy_dublicate: dict):

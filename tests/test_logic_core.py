@@ -1,5 +1,5 @@
 from src.logic import run_check
-from src.constants import RED_FILL_COLOR, ORANGE_FILL_COLOR
+from src.constants import RED_FILL_COLOR, ELOYY_FILL_COLOR, GREEN_FILL_COLOR
 
 
 class DummyLog:
@@ -13,7 +13,7 @@ class DummyLog:
         pass
 
 
-def test_run_check_red_and_orange(sprav_df, check_wb, monkeypatch):
+def test_run_check_red_and_yellow_without_duplicate_resolve(sprav_df, check_wb, monkeypatch):
     wb, ws = check_wb
     log = DummyLog()
 
@@ -30,8 +30,31 @@ def test_run_check_red_and_orange(sprav_df, check_wb, monkeypatch):
         log=log,
     )
 
-    # Иванов есть в справочнике и уволен (вторая запись) → оранжевый
-    assert ORANGE_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+    # Иванов — дубликат в справочнике, без разбора → жёлтый
+    assert ELOYY_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
     # Петров отсутствует → красный
     assert RED_FILL_COLOR in (ws["A3"].fill.start_color.rgb or "")
     assert "Петров Петр Петрович" in "".join(log.lines)
+
+
+def test_run_check_resolves_duplicate_to_green(sprav_df, check_wb, monkeypatch):
+    wb, ws = check_wb
+    log = DummyLog()
+
+    monkeypatch.setattr("src.logic.read_sprav_file", lambda _: sprav_df)
+    monkeypatch.setattr("src.logic.load_check_file", lambda _: (wb, ws))
+    monkeypatch.setattr("src.logic.save_file", lambda *_: None)
+
+    run_check(
+        sprav_file="sprav.xlsx",
+        check_file="check.xlsx",
+        output_file="out.xlsx",
+        check_dismissed=True,
+        check_duplicates=True,
+        prompt_duplicate_selection=False,
+        log=log,
+    )
+
+    # После фильтрации остаётся одна активная запись → зелёный
+    assert GREEN_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+    assert RED_FILL_COLOR in (ws["A3"].fill.start_color.rgb or "")

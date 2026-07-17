@@ -9,6 +9,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from src.logic import run_check
+from src.file_utils import peek_sheet_rows
 from src.ui.styles import COLORS, FONT_FAMILY, setup_styles
 
 
@@ -49,6 +50,9 @@ class EmployeeCheckApp:
     self.dismissed = tk.BooleanVar(value=True)
     self.duplicates = tk.BooleanVar(value=True)
     self.prompt_duplicates = tk.BooleanVar(value=True)
+    self.auto_header = tk.BooleanVar(value=True)
+    self.header_row = tk.IntVar(value=1)
+    self.header_info = tk.StringVar(value="Строка заголовков: авто")
     self.status = tk.StringVar(value="Готово к работе")
 
     self._configure_window()
@@ -141,7 +145,14 @@ class EmployeeCheckApp:
     frame.columnconfigure(1, weight=1)
 
     self._file_row(frame, 0, "Справочник", self.sprav, open_file=True)
-    self._file_row(frame, 1, "Файл проверки", self.check, open_file=True, on_change=self._suggest_output_name)
+    self._file_row(
+      frame,
+      1,
+      "Файл проверки",
+      self.check,
+      open_file=True,
+      on_change=self._on_check_file_changed,
+    )
     self._file_row(frame, 2, "Файл результата", self.output, open_file=False, save_file=True)
 
   def _file_row(
@@ -207,12 +218,50 @@ class EmployeeCheckApp:
       variable=self.prompt_duplicates,
     ).pack(anchor="w", pady=2)
 
+    header_frame = ttk.Frame(frame)
+    header_frame.pack(fill="x", pady=(10, 0))
+
+    self.auto_header_cb = ttk.Checkbutton(
+      header_frame,
+      text="Автоопределение строки заголовков (по колонке «ФИО»)",
+      variable=self.auto_header,
+      command=self._on_auto_header_toggle,
+    )
+    self.auto_header_cb.pack(anchor="w")
+
+    row_frame = ttk.Frame(header_frame)
+    row_frame.pack(fill="x", pady=(6, 0))
+
+    ttk.Label(row_frame, text="Строка заголовков:").pack(side="left")
+    self.header_spin = ttk.Spinbox(
+      row_frame,
+      from_=1,
+      to=500,
+      width=6,
+      textvariable=self.header_row,
+      command=self._on_header_row_manual,
+    )
+    self.header_spin.pack(side="left", padx=(8, 8))
+    self.header_spin.bind("<FocusOut>", lambda _e: self._on_header_row_manual())
+    self.header_spin.bind("<Return>", lambda _e: self._on_header_row_manual())
+
+    ttk.Button(
+      row_frame,
+      text="Выбрать в таблице…",
+      command=self._pick_header_row_dialog,
+    ).pack(side="left", padx=(0, 12))
+
+    ttk.Label(row_frame, textvariable=self.header_info).pack(side="left")
+    self._sync_header_controls()
+
   def _build_legend(self, parent: ttk.Frame) -> None:
     frame = ttk.Frame(parent)
     frame.pack(fill="x", pady=(0, 10))
 
     self._legend_item(frame, COLORS["red_marker"], "Красный — сотрудник не найден в справочнике")
     self._legend_item(frame, COLORS["orange_marker"], "Оранжевый — сотрудник уволен или неактивен")
+    self._legend_item(frame, COLORS["yellow_marker"], "Жёлтый — дубликат в справочнике")
+    self._legend_item(frame, COLORS["green_marker"], "Зелёный — дубликат разрешён однозначно")
 
   def _legend_item(self, parent: ttk.Frame, color: str, text: str) -> None:
     row = ttk.Frame(parent)
@@ -280,6 +329,140 @@ class EmployeeCheckApp:
     p = Path(check_path)
     self.output.set(str(p.with_name(f"{p.stem}_result.xlsx")))
 
+  def _on_check_file_changed(self, check_path: str) -> None:
+    self._suggest_output_name(check_path)
+    self._detect_header_for_check(check_path)
+
+  def _sync_header_controls(self) -> None:
+    state = "disabled" if self.auto_header.get() else "normal"
+    self.header_spin.configure(state=state)
+
+  def _on_auto_header_toggle(self) -> None:
+    self._sync_header_controls()
+    if self.auto_header.get():
+      path = self.check.get().strip()
+      if path and Path(path).is_file():
+        self._detect_header_for_check(path)
+      else:
+        self.header_info.set("Строка заголовков: авто")
+    else:
+      self.header_info.set(f"Строка заголовков: вручную → {self.header_row.get()}")
+
+  def _on_header_row_manual(self) -> None:
+    if self.auto_header.get():
+      return
+    try:
+      row = int(self.header_row.get())
+    except (tk.TclError, ValueError, TypeError):
+      row = 1
+      self.header_row.set(1)
+    if row < 1:
+      row = 1
+      self.header_row.set(1)
+    self.header_info.set(f"Строка заголовков: вручную → {row}")
+
+  def _detect_header_for_check(self, check_path: str) -> None:
+    try:
+      _rows, detected = peek_sheet_rows(check_path, max_rows=5)
+    except Exception as exc:
+      self.header_info.set(f"Не удалось прочитать файл: {exc}")
+      return
+
+    if detected:
+      self.header_row.set(detected)
+      if self.auto_header.get():
+        self.header_info.set(f"Строка заголовков: авто → {detected}")
+      else:
+        self.header_info.set(f"Строка заголовков: вручную → {self.header_row.get()}")
+      self.status.set(f"Заголовки найдены в строке {detected}")
+    else:
+      self.header_info.set("Колонка «ФИО» не найдена — выберите строку вручную")
+      self.auto_header.set(False)
+      self._sync_header_controls()
+      self.status.set("Укажите строку заголовков вручную")
+
+  def _pick_header_row_dialog(self) -> None:
+    path = self.check.get().strip()
+    if not path or not Path(path).is_file():
+      messagebox.showwarning(
+        self.WINDOW_TITLE,
+        "Сначала выберите файл проверки.",
+        parent=self.root,
+      )
+      return
+
+    try:
+      preview_rows, detected = peek_sheet_rows(path, max_rows=40)
+    except Exception as exc:
+      messagebox.showerror(self.WINDOW_TITLE, f"Не удалось прочитать файл:\n{exc}", parent=self.root)
+      return
+
+    selected = [None]
+
+    win = tk.Toplevel(self.root)
+    win.title("Выбор строки заголовков")
+    win.geometry("920x480")
+    win.minsize(720, 360)
+    win.transient(self.root)
+    win.grab_set()
+
+    body = ttk.Frame(win, padding=12)
+    body.pack(fill="both", expand=True)
+    body.rowconfigure(1, weight=1)
+    body.columnconfigure(0, weight=1)
+
+    hint = (
+      f"Выберите строку, в которой находятся заголовки (колонка «ФИО»). "
+      f"{'Найдена автоматически: ' + str(detected) if detected else 'Автоматически не найдена.'}"
+    )
+    ttk.Label(body, text=hint, wraplength=860).grid(row=0, column=0, sticky="w", pady=(0, 8))
+
+    max_cells = max((len(r) - 1 for r in preview_rows), default=1)
+    cols = ["№ строки"] + [f"C{i}" for i in range(1, max_cells + 1)]
+
+    tree = ttk.Treeview(body, columns=cols, show="headings", height=16)
+    for col in cols:
+      tree.heading(col, text=col)
+      tree.column(col, width=110 if col != "№ строки" else 70, anchor="w")
+
+    for row_data in preview_rows:
+      values = list(row_data) + [""] * (len(cols) - len(row_data))
+      tree.insert("", "end", iid=str(row_data[0]), values=values[: len(cols)])
+
+    if detected and str(detected) in tree.get_children():
+      tree.selection_set(str(detected))
+      tree.see(str(detected))
+    elif tree.get_children():
+      tree.selection_set(tree.get_children()[0])
+
+    tree.grid(row=1, column=0, sticky="nsew")
+    scroll = ttk.Scrollbar(body, orient="vertical", command=tree.yview)
+    scroll.grid(row=1, column=1, sticky="ns")
+    tree.configure(yscrollcommand=scroll.set)
+
+    def on_ok() -> None:
+      sel = tree.selection()
+      if not sel:
+        messagebox.showwarning("Выбор", "Выберите строку заголовков.", parent=win)
+        return
+      selected[0] = int(sel[0])
+      win.destroy()
+
+    btn_row = ttk.Frame(body)
+    btn_row.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+    ttk.Button(btn_row, text="Выбрать", command=on_ok).pack(side="left")
+    ttk.Button(btn_row, text="Отмена", command=win.destroy).pack(side="right")
+
+    win.wait_window()
+    if selected[0] is None:
+      return
+
+    self.auto_header.set(False)
+    self.header_row.set(selected[0])
+    self._sync_header_controls()
+    self.header_info.set(f"Строка заголовков: вручную → {selected[0]}")
+    self.status.set(f"Выбрана строка заголовков: {selected[0]}")
+
   def _clear_log(self) -> None:
     self._set_log_text("")
     self._append_log("Журнал очищен.\n")
@@ -343,6 +526,7 @@ class EmployeeCheckApp:
     error: str | None = None
 
     try:
+      header_row = None if self.auto_header.get() else int(self.header_row.get())
       run_check(
         sprav_file=self.sprav.get().strip(),
         check_file=self.check.get().strip(),
@@ -350,6 +534,7 @@ class EmployeeCheckApp:
         check_dismissed=self.dismissed.get(),
         check_duplicates=self.duplicates.get(),
         prompt_duplicate_selection=self.prompt_duplicates.get(),
+        header_row=header_row,
         log=self._log_writer,
         parent=self.root,
       )

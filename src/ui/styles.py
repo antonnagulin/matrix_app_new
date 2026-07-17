@@ -18,6 +18,8 @@ COLORS = {
     "danger": "#d13438",
     "red_marker": "#ff9999",
     "orange_marker": "#ff7500",
+    "yellow_marker": "#ffff00",
+    "green_marker": "#00756f",
     "header_bg": "#0078d4",
     "header_fg": "#ffffff",
 }

@@ -1,7 +1,7 @@
 import pandas as pd
 from datetime import datetime
 
-from src.filters import normalize_fio, is_active, is_dismissed
+from src.filters import normalize_fio, is_active, is_dismissed, normalize_spr_fio, is_full_fio, join_with_slash
 
 
 class TestNormalizeFio:
@@ -110,3 +110,44 @@ class TestIsDismissed:
 
     def test_missing_keys_treated_as_dismissed(self):
         assert is_dismissed({}) is True
+
+
+class TestNormalizeSprFio:
+    def test_full_name(self):
+        assert normalize_spr_fio("Иванов Иван Иванович") == "ИВАНОВ ИВАН ИВАНОВИЧ"
+
+    def test_yo(self):
+        assert normalize_spr_fio("Ёлкин Егор Егорович") == "ЕЛКИН ЕГОР ЕГОРОВИЧ"
+
+    def test_short_name_returns_empty(self):
+        assert normalize_spr_fio("Иванов Иван") == ""
+        assert normalize_spr_fio(None) == ""
+
+
+class TestIsFullFio:
+    def test_full_fio(self):
+        assert is_full_fio("Иванов Иван Иванович") is True
+
+    def test_initials_with_dots_count_as_full_by_current_rules(self):
+        # «И.» — двухсимвольная часть, is_full_fio считает строку полной
+        assert is_full_fio("Иванов И. И.") is True
+
+    def test_single_letter_parts_not_full(self):
+        assert is_full_fio("Иванов И И") is False
+
+    def test_two_words_not_full(self):
+        assert is_full_fio("Иванов Иван") is False
+
+
+class TestJoinWithSlash:
+    def test_joins_non_empty_levels(self):
+        row = {
+            "Орг. единица уровня 1": "Офис",
+            "Орг. единица уровня 2": "IT",
+            "Орг. единица уровня 3": "",
+            "Орг. единица уровня 4": None,
+        }
+        assert join_with_slash(row) == "Офис / IT"
+
+    def test_empty_row(self):
+        assert join_with_slash({}) == ""
