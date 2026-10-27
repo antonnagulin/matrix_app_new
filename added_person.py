@@ -83,7 +83,7 @@ class App:
 
     # --- Выбор второго файла ---
     def select_file2(self):
-        path = filedialog.askopenfilename(filetypes=[("Excel files","*.xlsx")])
+        path = filedialog.askopenfilename(filetypes=[("Файлы Excel","*.xlsx")])
         if path:
             self.file2_path.set(path)
 
@@ -145,7 +145,7 @@ class App:
                     sprav_file=SPRAV_FILE,
                     check_file=saved_file,
                     output_file=output_file,
-                    chainge_fio_file=CHAINGE_FIO_FILE,
+                    renamed_fio_file=CHAINGE_FIO_FILE,
                     log=None  
                 )
                 print("\nПроверка run_check завершена.")

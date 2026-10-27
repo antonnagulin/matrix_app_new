@@ -17,14 +17,15 @@ poetry run python -m src.main
 
 ```powershell
 pip install -U pip
-pip install "pandas>=3,<4" "openpyxl>=3.1.5,<4" "tqdm>=4.67,<5" "xlrd>=2,<3" "tabulate>=0.10,<0.11"
+pip install "pandas>=3,<4" "openpyxl>=3.1.5,<4"
+pip install "pytest>=9,<10"   # для тестов (опционально)
 ```
 
 ## 3. Установите зависимости (обязательно)
 
 ```powershell
 cd C:\Users\User\programs\matrix_applications
-poetry install --extras build
+poetry install --extras "dev build"
 poetry run python -c "import pandas, openpyxl; print('OK')"
 ```
 

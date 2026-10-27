@@ -10,6 +10,9 @@ ACTIVE_DATE = "31.12.9999"
 # Цвета для подсветки
 RED_FILL_COLOR = "FF9999"      # отсутствующие
 ORANGE_FILL_COLOR = "FF7500"   # уволенные
-ELOYY_FILL_COLOR = "FFFF00"
+YELLOW_FILL_COLOR = "FFFF00"   # дубликаты
 GREEN_FILL_COLOR = "00756F"
 BROWN_FILL_COLOR = "A0522D"
+
+# Совместимость со старым именем
+ELOYY_FILL_COLOR = YELLOW_FILL_COLOR

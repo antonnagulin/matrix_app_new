@@ -1,7 +1,8 @@
 import pandas as pd
 from datetime import datetime
 
-from src.filters import normalize_fio, is_active, is_dismissed, normalize_spr_fio, is_full_fio, join_with_slash
+from src.filters import normalize_fio, is_active, is_dismissed, is_full_fio, join_with_slash
+from src.fio_index import full_fio_key
 
 
 class TestNormalizeFio:
@@ -112,25 +113,25 @@ class TestIsDismissed:
         assert is_dismissed({}) is True
 
 
-class TestNormalizeSprFio:
+class TestFullFioKey:
     def test_full_name(self):
-        assert normalize_spr_fio("Иванов Иван Иванович") == "ИВАНОВ ИВАН ИВАНОВИЧ"
+        assert full_fio_key("Иванов Иван Иванович") == "ИВАНОВ ИВАН ИВАНОВИЧ"
 
     def test_yo(self):
-        assert normalize_spr_fio("Ёлкин Егор Егорович") == "ЕЛКИН ЕГОР ЕГОРОВИЧ"
+        assert full_fio_key("Ёлкин Егор Егорович") == "ЕЛКИН ЕГОР ЕГОРОВИЧ"
 
-    def test_short_name_returns_empty(self):
-        assert normalize_spr_fio("Иванов Иван") == ""
-        assert normalize_spr_fio(None) == ""
+    def test_two_words_kept(self):
+        assert full_fio_key("Иванов Иван") == "ИВАНОВ ИВАН"
+        assert full_fio_key(None) == ""
 
 
 class TestIsFullFio:
     def test_full_fio(self):
         assert is_full_fio("Иванов Иван Иванович") is True
 
-    def test_initials_with_dots_count_as_full_by_current_rules(self):
-        # «И.» — двухсимвольная часть, is_full_fio считает строку полной
-        assert is_full_fio("Иванов И. И.") is True
+    def test_initials_with_dots_are_not_full(self):
+        assert is_full_fio("Иванов И. И.") is False
+        assert is_full_fio("Смирнов А. Н.") is False
 
     def test_single_letter_parts_not_full(self):
         assert is_full_fio("Иванов И И") is False

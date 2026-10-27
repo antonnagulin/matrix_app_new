@@ -30,26 +30,29 @@ def _dismissed(**extra):
 
 def test_check_duplicate_single_active_resolves():
     data = {KEY: [_active()]}
-    new_d, not_d, dismissed = check_duplicate(data)
+    new_d, not_d, dismissed, joints = check_duplicate(data)
     assert new_d == {}
     assert len(not_d) == 1
     assert dismissed == {}
+    assert joints == {}
 
 
 def test_check_duplicate_two_active_stays_ambiguous():
     data = {KEY: [_active(), _active(**{"Штатная должность": "Менеджер"})]}
-    new_d, not_d, dismissed = check_duplicate(data)
+    new_d, not_d, dismissed, joints = check_duplicate(data)
     assert len(new_d) == 1
     assert not_d == {}
     assert dismissed == {}
+    assert joints == {}
 
 
 def test_check_duplicate_all_dismissed():
     data = {KEY: [_dismissed(), _dismissed(**{"Увольн.": "15.03.2021"})]}
-    new_d, not_d, dismissed = check_duplicate(data)
+    new_d, not_d, dismissed, joints = check_duplicate(data)
     assert new_d == {}
     assert not_d == {}
     assert len(dismissed) == 1
+    assert joints == {}
 
 
 def test_check_duplicate_skips_internal_part_time():
@@ -59,17 +62,38 @@ def test_check_duplicate_skips_internal_part_time():
             _active(**{"Группа сотрудников": "Внутренние совмест."}),
         ]
     }
-    new_d, not_d, dismissed = check_duplicate(data)
+    new_d, not_d, dismissed, joints = check_duplicate(data)
     assert new_d == {}
     assert len(not_d) == 1
+    assert joints == {}
+
+
+def test_check_duplicate_joints_only_not_labeled_dismissed():
+    data = {
+        KEY: [
+            _active(**{"Группа сотрудников": "Внутренние совмест."}),
+            _active(
+                **{
+                    "Группа сотрудников": "Внутренние совмест.",
+                    "Штатная должность": "Менеджер",
+                }
+            ),
+        ]
+    }
+    new_d, not_d, dismissed, joints = check_duplicate(data)
+    assert new_d == {}
+    assert not_d == {}
+    assert dismissed == {}
+    assert len(joints) == 1
 
 
 def test_check_duplicate_active_plus_dismissed_resolves():
     data = {KEY: [_active(), _dismissed()]}
-    new_d, not_d, dismissed = check_duplicate(data)
+    new_d, not_d, dismissed, joints = check_duplicate(data)
     assert new_d == {}
     assert len(not_d) == 1
     assert dismissed == {}
+    assert joints == {}
 
 
 def test_second_check_duplicate_full_fio_single_match():
@@ -97,8 +121,19 @@ def test_second_check_duplicate_full_fio_multiple_matches():
     assert not_d == {}
 
 
-def test_second_check_duplicate_skips_initials_in_check_file():
-    key = (3, "ИВАНОВ ИИ", "Иванов И. И.", "IT")
-    new_d, not_d = second_check_duplicate({key: [_active()]})
-    assert new_d == {}
-    assert not_d == {}
+def test_second_check_duplicate_initials_go_to_manual_selection():
+    """Инициалы вроде «Смирнов А. Н.» не совпадают с полным ФИО в справочнике → ручной выбор."""
+    key = (3, "СМИРНОВ АН", "Смирнов А. Н.", "IT")
+    rec1 = _active(**{"ФИО": "Смирнов Алексей Николаевич", "Штатная должность": "Инженер"})
+    rec2 = _active(**{"ФИО": "Смирнов Алексей Николаевич", "Штатная должность": "Программист"})
+    remaining, resolved = second_check_duplicate({key: [rec1, rec2]})
+    assert len(remaining) == 1
+    assert resolved == {}
+    assert len(remaining[key]) == 2
+
+
+def test_second_check_duplicate_short_initials_without_dots_go_to_manual():
+    key = (3, "ИВАНОВ ИИ", "Иванов И И", "IT")
+    remaining, resolved = second_check_duplicate({key: [_active()]})
+    assert len(remaining) == 1
+    assert resolved == {}

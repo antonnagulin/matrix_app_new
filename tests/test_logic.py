@@ -44,15 +44,16 @@ def test_run_check_end_to_end(tmp_path):
     )
 
     assert Path(output_file).exists()
-    ws = load_workbook(output_file).active
+    clean = load_workbook(output_file).active
+    # Итоговый файл: только активный Иванов, без подсветки
+    assert clean["A2"].value == "Иванов И. И."
+    assert clean["A3"].value is None
+    clean_fill = clean["A2"].fill.start_color.rgb or ""
+    assert RED_FILL_COLOR not in clean_fill
+    assert ORANGE_FILL_COLOR not in clean_fill
 
-    # Иванов — активен, без подсветки
-    ivanov_fill = ws["A2"].fill.start_color.rgb or ""
-    assert RED_FILL_COLOR not in ivanov_fill
-    assert ORANGE_FILL_COLOR not in ivanov_fill
-
+    review = load_workbook(tmp_path / "output_review.xlsx").active
     # Петров — уволен по должности → оранжевый
-    assert ORANGE_FILL_COLOR in (ws["A3"].fill.start_color.rgb or "")
-
+    assert ORANGE_FILL_COLOR in (review["A3"].fill.start_color.rgb or "")
     # Сидоров — нет в справочнике → красный
-    assert RED_FILL_COLOR in (ws["A4"].fill.start_color.rgb or "")
+    assert RED_FILL_COLOR in (review["A4"].fill.start_color.rgb or "")

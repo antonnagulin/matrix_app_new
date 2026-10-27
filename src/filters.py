@@ -26,26 +26,18 @@ def normalize_fio(fio: str) -> str:
 
 
 
-def normalize_spr_fio(fio: str) -> str:
-    if pd.isna(fio) or fio is None:
-        return ""
-
-    fio = fio.replace("Ё", "Е").replace("ё", "е")  # нормализуем ё
-    parts = fio.split()
-    if len(parts) >= 3:
-        return f"{parts[0]} {parts[1]} {parts[2]}".upper()
-    
-    return ""
-
-
 def is_full_fio(fio: str) -> bool:
     """
     Проверяет, что ФИО в формате 'Иванов Иван Иванович'
+    (не инициалы вроде 'Иванов И. И.' / 'Иванов И И').
     """
-    parts = fio.split()
+    if fio is None or (isinstance(fio, float) and pd.isna(fio)):
+        return False
+    parts = str(fio).split()
     if len(parts) != 3:
         return False
-    return all(len(p) > 1 for p in parts)
+    # После удаления точек каждая часть должна быть полноценным словом
+    return all(len(p.replace(".", "").strip()) > 1 for p in parts)
 
 
 def is_active(dismiss_value) -> bool:

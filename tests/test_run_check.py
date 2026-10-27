@@ -30,15 +30,28 @@ def _make_check_wb(rows):
 
 
 def _patch_io(monkeypatch, sprav_df, wb, ws, saved=None):
-    monkeypatch.setattr("src.logic.read_sprav_file", lambda _: sprav_df)
-    monkeypatch.setattr("src.logic.load_check_file", lambda _: (wb, ws))
+    monkeypatch.setattr("src.logic.read_sprav_file", lambda *a, **k: sprav_df)
+    monkeypatch.setattr("src.logic.load_check_file", lambda *a, **k: (wb, ws, None))
 
     def _save(workbook, path):
         if saved is not None:
             saved["path"] = path
             saved["wb"] = workbook
+            saved.setdefault("files", {})[str(path)] = workbook
+            workbook.save(path)
 
     monkeypatch.setattr("src.logic.save_file", _save)
+
+
+def _col(ws, header: str) -> int:
+    for col in range(1, (ws.max_column or 1) + 1):
+        if ws.cell(row=1, column=col).value == header:
+            return col
+    raise AssertionError(f"Колонка «{header}» не найдена")
+
+
+def _fill_at(ws, header: str, row: int = 2) -> str:
+    return ws.cell(row=row, column=_col(ws, header)).fill.start_color.rgb or ""
 
 
 def test_marks_missing_employee_red(monkeypatch):
@@ -169,7 +182,8 @@ def test_asks_once_for_duplicate_missing_fio(monkeypatch):
         return "no"
 
     monkeypatch.setattr("src.logic.ask_include_missing", fake_ask)
-    _patch_io(monkeypatch, sprav_df, wb, ws)
+    saved = {}
+    _patch_io(monkeypatch, sprav_df, wb, ws, saved=saved)
 
     run_check(
         "sprav.xlsx",
@@ -180,9 +194,16 @@ def test_asks_once_for_duplicate_missing_fio(monkeypatch):
         parent=object(),
     )
 
-    # Диалог и красная подсветка — только для первого вхождения ФИО
+    # Диалог — один раз; красная подсветка — на всех вхождениях
     assert calls["count"] == 1
     assert RED_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+    assert RED_FILL_COLOR in (ws["A3"].fill.start_color.rgb or "")
+    assert (ws["E2"].value or "") == "Не найден в справочнике"
+    assert (ws["E3"].value or "") == "Не найден в справочнике"
+    # Повторы не попадают в итоговый clean-файл
+    clean_ws = saved["files"]["out.xlsx"].active
+    assert clean_ws["A2"].value is None
+
 
 
 def test_repeat_missing_fio_does_not_crash_with_dismissed_check(monkeypatch):
@@ -269,13 +290,14 @@ def test_yes_all_includes_subsequent_missing_without_prompt(monkeypatch, tmp_pat
     )
     output = tmp_path / "result.xlsx"
     calls = {"count": 0}
+    saved = {}
 
     def fake_ask(_parent, fio):
         calls["count"] += 1
         return "yes_all" if fio == "Первый Н. Н." else "no"
 
     monkeypatch.setattr("src.logic.ask_include_missing", fake_ask)
-    _patch_io(monkeypatch, sprav_df, wb, ws)
+    _patch_io(monkeypatch, sprav_df, wb, ws, saved=saved)
 
     run_check(
         "sprav.xlsx",
@@ -340,9 +362,12 @@ def test_duplicates_logged_and_selection_called(monkeypatch):
     assert selected["count"] == 2
     assert "Дубликаты в справочнике для" in log.text()
     assert "Выбрана актуальная запись" in log.text()
-    assert GREEN_FILL_COLOR in (ws["D2"].fill.start_color.rgb or "")
-    assert ELOYY_FILL_COLOR in (ws["C2"].fill.start_color.rgb or "")
-    assert ws["E2"].value == "Дубликат выбран вручную (шаг 3)"
+    assert GREEN_FILL_COLOR in _fill_at(ws, "Дубль выбор")
+    assert ELOYY_FILL_COLOR in _fill_at(ws, "Дубль шаг 3")
+    assert ELOYY_FILL_COLOR not in _fill_at(ws, "Отдел")
+    assert ws.cell(row=2, column=_col(ws, "Комментарий")).value == (
+        "Дубликат выбран вручную (шаг 3)"
+    )
 
 
 def test_skip_all_duplicates_skips_remaining_prompts(monkeypatch):
@@ -499,8 +524,15 @@ def test_saves_output_file(monkeypatch):
         check_duplicates=False,
     )
 
-    assert saved["path"] == "custom_out.xlsx"
-    assert saved["wb"] is wb
+    assert "custom_out.xlsx" in saved["files"]
+    assert "custom_out_review.xlsx" in saved["files"]
+    assert saved["files"]["custom_out_review.xlsx"] is wb
+    assert saved["files"]["custom_out.xlsx"] is not wb
+    # Итоговый файл — только активный сотрудник
+    clean_ws = saved["files"]["custom_out.xlsx"].active
+    assert clean_ws["A1"].value == "ФИО"
+    assert clean_ws["A2"].value == "Иванов Иван Иванович"
+    assert clean_ws["A3"].value is None
 
 
 def test_no_answer_does_not_create_included_report(monkeypatch, tmp_path):
@@ -617,8 +649,10 @@ def test_mixed_duplicate_resolves_to_green(monkeypatch):
     )
 
     assert calls["count"] == 0
-    assert GREEN_FILL_COLOR in (ws["B2"].fill.start_color.rgb or "")
+    assert GREEN_FILL_COLOR in _fill_at(ws, "Дубль шаг 2")
     assert ELOYY_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
+    assert ELOYY_FILL_COLOR not in _fill_at(ws, "Отдел")
+    assert GREEN_FILL_COLOR not in _fill_at(ws, "Отдел")
 
 
 def test_all_dismissed_duplicates_mark_orange(monkeypatch):

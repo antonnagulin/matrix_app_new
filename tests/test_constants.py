@@ -6,6 +6,8 @@ from src.constants import (
     ACTIVE_DATE,
     RED_FILL_COLOR,
     ORANGE_FILL_COLOR,
+    YELLOW_FILL_COLOR,
+    ELOYY_FILL_COLOR,
 )
 
 
@@ -23,3 +25,5 @@ def test_active_date_constant():
 def test_fill_color_constants():
     assert RED_FILL_COLOR == "FF9999"
     assert ORANGE_FILL_COLOR == "FF7500"
+    assert YELLOW_FILL_COLOR == "FFFF00"
+    assert ELOYY_FILL_COLOR == YELLOW_FILL_COLOR

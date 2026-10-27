@@ -3,6 +3,8 @@
 *.xlsx
 .vscode/settings.json
 *.pyc
+__pycache__/
+.pytest_cache/
 .vscode
 .~*
 *.XLSX

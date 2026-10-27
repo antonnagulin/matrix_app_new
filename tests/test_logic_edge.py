@@ -23,9 +23,20 @@ class DummyLog:
 
 
 def _patch_io(monkeypatch, sprav_df, wb, ws):
-    monkeypatch.setattr("src.logic.read_sprav_file", lambda _: sprav_df)
-    monkeypatch.setattr("src.logic.load_check_file", lambda _: (wb, ws))
+    monkeypatch.setattr("src.logic.read_sprav_file", lambda *a, **k: sprav_df)
+    monkeypatch.setattr("src.logic.load_check_file", lambda *a, **k: (wb, ws, None))
     monkeypatch.setattr("src.logic.save_file", lambda *_: None)
+
+
+def _col(ws, header: str) -> int:
+    for col in range(1, (ws.max_column or 1) + 1):
+        if ws.cell(row=1, column=col).value == header:
+            return col
+    raise AssertionError(f"Колонка «{header}» не найдена")
+
+
+def _fill_at(ws, header: str, row: int = 2) -> str:
+    return ws.cell(row=row, column=_col(ws, header)).fill.start_color.rgb or ""
 
 
 def test_invalid_header_row_raises(monkeypatch):
@@ -117,11 +128,14 @@ def test_duplicate_choice_marks_green(monkeypatch):
         parent=object(),
     )
 
-    assert GREEN_FILL_COLOR in (ws["D2"].fill.start_color.rgb or "")
+    assert GREEN_FILL_COLOR in _fill_at(ws, "Дубль выбор")
     assert ELOYY_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
-    assert ELOYY_FILL_COLOR in (ws["B2"].fill.start_color.rgb or "")
-    assert ELOYY_FILL_COLOR in (ws["C2"].fill.start_color.rgb or "")
-    assert ws["E2"].value == "Дубликат выбран вручную (шаг 3)"
+    assert ELOYY_FILL_COLOR in _fill_at(ws, "Дубль шаг 2")
+    assert ELOYY_FILL_COLOR in _fill_at(ws, "Дубль шаг 3")
+    assert ELOYY_FILL_COLOR not in _fill_at(ws, "Отдел")
+    assert ws.cell(row=2, column=_col(ws, "Комментарий")).value == (
+        "Дубликат выбран вручную (шаг 3)"
+    )
 
 
 def test_duplicate_choice_marks_orange_when_dismissed(monkeypatch):
@@ -164,10 +178,13 @@ def test_duplicate_choice_marks_orange_when_dismissed(monkeypatch):
         parent=object(),
     )
 
-    assert ORANGE_FILL_COLOR in (ws["D2"].fill.start_color.rgb or "")
+    assert ORANGE_FILL_COLOR in _fill_at(ws, "Дубль выбор")
     assert ELOYY_FILL_COLOR in (ws["A2"].fill.start_color.rgb or "")
-    assert ELOYY_FILL_COLOR in (ws["C2"].fill.start_color.rgb or "")
-    assert ws["E2"].value == "Дубликат выбран вручную — уволенная запись (шаг 3)"
+    assert ELOYY_FILL_COLOR in _fill_at(ws, "Дубль шаг 3")
+    assert ELOYY_FILL_COLOR not in _fill_at(ws, "Отдел")
+    assert ws.cell(row=2, column=_col(ws, "Комментарий")).value == (
+        "Дубликат выбран вручную — уволенная запись (шаг 3)"
+    )
 
 
 def test_skip_all_constant_value():

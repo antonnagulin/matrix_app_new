@@ -26,8 +26,9 @@ curl -sSL https://install.python-poetry.org | python3 -
 
 ```bash
 cd /path/to/matrix_applications
-poetry install --extras build --no-root
+poetry install --extras "dev build" --no-root
 poetry run python -c "import tkinter, pandas, openpyxl; print('OK')"
+poetry run pytest -q
 ```
 
 ## 4. Запуск из исходников
@@ -74,7 +75,7 @@ sudo apt install --reinstall python3-tk
 ### `ModuleNotFoundError: No module named 'pandas'`
 
 ```bash
-poetry install --extras build --no-root
+poetry install --extras "dev build" --no-root
 ```
 
 ### Нет прав на запуск скриптов
